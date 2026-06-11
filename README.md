@@ -61,6 +61,23 @@ To clean build artifacts:
 make clean
 ```
 
+### Tested environment
+
+Confirmed working on WSL (Windows Subsystem for Linux) on Windows 11.
+
+---
+
+## Performance
+
+Runtime depends heavily on the input permutations. For $n \le 13$, most pairs complete in a reasonable time, though some cases can take significantly longer.
+
+Measured on AMD Ryzen 5 9600X:
+
+```bash
+time ./klc_cpp 0123456789a 789a3456012
+# ~40 seconds
+```
+
 ---
 
 ## Usage
@@ -114,7 +131,7 @@ Verify against a file:
 
 - Gregory S. Warrington, original C implementation ([official webpage](https://gswarrin.w3.uvm.edu/research/klc/klc.html))
 - A. Lascoux, *Polynômes de Kazhdan-Lusztig pour les variétés de Schubert vexillaires*, C. R. Acad. Sci. Paris Sér. I Math. 321 (1995), 667–670.
-- Sara Billey and V. Lakshmibai, *Singular Loci of Schubert Varieties*, Vol. 182. Springer Science & Business Media, 2000 (Section 6.3.28).
+- Sara Billey and Venkatramani Lakshmibai, *Singular Loci of Schubert Varieties*, Progress in Mathematics, vol. 182, Birkhäuser/Springer, 2000. — Contains an accessible treatment of Lascoux's algorithm (Section 6.3.28).
 
 ---
 
