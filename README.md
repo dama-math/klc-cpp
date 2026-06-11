@@ -2,10 +2,12 @@
 
 This is a high-performance C++ program for calculating Kazhdan-Lusztig (KL) polynomials for permutations in symmetric groups.
 
+This calculator is based on the C implementation by Gregory S. Warrington (available at https://gswarrin.w3.uvm.edu/research/klc/klc.html).
+
 The calculator utilizes various optimizations to speed up the computation, such as:
-- Caching of previously calculated polynomials and $\mu$ coefficients.
-- The rank matrix algorithm for fast Bruhat order comparisons.
-- Lascoux's algorithm for pattern-free permutations.
+- Lascoux's algorithm for 3412-free (vexillary) permutations.
+  - Original paper: A. Lascoux, *Polynômes de Kazhdan-Lusztig pour les variétés de Schubert vexillaires*, C. R. Acad. Sci. Paris Sér. I Math. 321 (1995), 667–670.
+  - See also: Sara Billey and V. Lakshmibai, *Singular Loci of Schubert Varieties* (Section 6.3.28).
 - Efficient memory layouts and bit manipulation.
 
 ## Build Instructions
@@ -85,4 +87,4 @@ Permutations are represented in one-line notation. For elements $10$ and above, 
 
 ## License
 
-This project is intended for release and academic/computational use.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
