@@ -13,18 +13,6 @@ using ValueType = int8_t; // Must match Permutation::ValueType
 constexpr ValueType REMOVED = -1;
 
 /**
- * @brief Helper function to swap two int8_t values efficiently.
- * 
- * @param a Reference to the first value.
- * @param b Reference to the second value.
- */
-inline void swap_val(ValueType& a, ValueType& b) {
-    ValueType tmp = a;
-    a = b;
-    b = tmp;
-}
-
-/**
  * @brief Attempts to apply an extremal pair reduction in place.
  * 
  * Modifies the data arrays directly to transform the pair into an extremal pair
@@ -58,8 +46,8 @@ bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
             if (w_data[i] > w_data[i + 1] && x_data[i] < x_data[i + 1]) {
                 int val1 = x_data[i];
                 int val2 = x_data[i + 1];
-                swap_val(x_data[i], x_data[i + 1]);
-                swap_val(x_inv[val1], x_inv[val2]);
+                std::swap(x_data[i], x_data[i + 1]);
+                std::swap(x_inv[val1], x_inv[val2]);
                 changed = true;
             }
         }
@@ -67,8 +55,8 @@ bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
         // Inverse pass
         for (int i = 0; i < n - 1; ++i) {
             if (w_inv[i] > w_inv[i + 1] && x_inv[i] < x_inv[i + 1]) {
-                swap_val(x_data[x_inv[i]], x_data[x_inv[i + 1]]);
-                swap_val(x_inv[i], x_inv[i + 1]);
+                std::swap(x_data[x_inv[i]], x_data[x_inv[i + 1]]);
+                std::swap(x_inv[i], x_inv[i + 1]);
                 changed = true;
             }
         }
@@ -172,11 +160,10 @@ void reduce(Permutation& x, Permutation& w) {
     int n = x.size();
 
     bool changed = true;
-    bool changed_x = false;
-    bool changed_w = false;
+    bool modified = false;
     
     while (changed) {
-        if (make_ep_inplace(x_data, w_data, n)) changed_x = true;
+        if (make_ep_inplace(x_data, w_data, n)) modified = true;
         
         int removed_count = tilde_inplace(x_data, w_data, n);
         if (removed_count > 0) {
@@ -185,16 +172,18 @@ void reduce(Permutation& x, Permutation& w) {
             x.set_size(n);
             w.set_size(n);
             changed = true;
-            changed_x = true;
-            changed_w = true;
+            modified = true;
         } else {
             changed = false;
         }
     }
     
-    // Invalidate length caches if permutations were modified
-    if (changed_x) x.reset_length_cache();
-    if (changed_w) w.reset_length_cache();
+    // Conservatively invalidate length caches for both permutations
+    // since make_ep_inplace can modify x data and tilde/flatten can modify both.
+    if (modified) {
+        x.reset_length_cache();
+        w.reset_length_cache();
+    }
 }
 
 bool is_extremal_pair(const Permutation& x, const Permutation& w) {
@@ -278,23 +267,21 @@ bool is_extremal_pair(const std::vector<int>& x_data, const std::vector<int>& w_
 }
 
 bool is_bruhat_less_than(const std::vector<int>& x_data, const std::vector<int>& w_data) {
-    // Legacy implementation for vector inputs
     if (x_data.size() != w_data.size()) return false;
     int n = x_data.size();
     if (n == 0) return true;
 
-    std::vector<int> prev_row(n, 0);
-    std::vector<int> current_row(n, 0);
+    // Use the same efficient diff-row technique as the Permutation overload
+    std::vector<int> diff_row(n, 0);
 
     for (int i = 0; i < n; ++i) {
+        int xi = x_data[i];
+        int wi = w_data[i];
+        
         for (int j = 0; j < n; ++j) {
-            int val = (i == 0) ? 0 : prev_row[j];
-            if (x_data[i] <= j && j < w_data[i]) val++;
-            if (w_data[i] <= j && j < x_data[i]) val--;
-            if (val < 0) return false;
-            current_row[j] = val;
+            diff_row[j] += (j >= xi) - (j >= wi);
+            if (diff_row[j] < 0) return false;
         }
-        prev_row = current_row;
     }
 
     return true;

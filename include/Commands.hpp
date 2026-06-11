@@ -1,5 +1,4 @@
-#ifndef COMMANDS_HPP
-#define COMMANDS_HPP
+#pragma once
 
 #include <string>
 #include "KLCalculator.hpp"
@@ -37,4 +36,3 @@ void verify_from_file(const std::string& filename, KLPolynomialCalculator& calcu
  */
 void cyclic_test(int n);
 
-#endif // COMMANDS_HPP

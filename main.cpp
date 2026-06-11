@@ -37,10 +37,15 @@ int main(int argc, char* argv[]) {
             std::cerr << "Usage: " << argv[0] << " --random n [num_calculations] [seed]" << std::endl;
             return 1;
         }
-        int n = std::stoi(argv[2]);
-        int num_calculations = (argc > 3) ? std::stoi(argv[3]) : 10;
-        int seed = (argc > 4) ? std::stoi(argv[4]) : std::random_device{}();
-        random_kl_calculations(n, num_calculations, seed);
+        try {
+            int n = std::stoi(argv[2]);
+            int num_calculations = (argc > 3) ? std::stoi(argv[3]) : 10;
+            int seed = (argc > 4) ? std::stoi(argv[4]) : std::random_device{}();
+            random_kl_calculations(n, num_calculations, seed);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: invalid argument: " << e.what() << std::endl;
+            return 1;
+        }
         return 0;
     }
 
@@ -59,8 +64,13 @@ int main(int argc, char* argv[]) {
             std::cerr << "Usage: " << argv[0] << " --cyclic n" << std::endl;
             return 1;
         }
-        int n = std::stoi(argv[2]);
-        cyclic_test(n);
+        try {
+            int n = std::stoi(argv[2]);
+            cyclic_test(n);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: invalid argument: " << e.what() << std::endl;
+            return 1;
+        }
         return 0;
     }
 

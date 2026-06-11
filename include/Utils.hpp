@@ -1,5 +1,4 @@
-#ifndef UTILS_HPP
-#define UTILS_HPP
+#pragma once
 
 #include <vector>
 #include <string>
@@ -49,4 +48,3 @@ struct PermutationHasher {
  */
 Permutation get_pattern(std::vector<int> vec);
 
-#endif // UTILS_HPP

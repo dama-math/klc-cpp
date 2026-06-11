@@ -63,6 +63,24 @@ public:
         throw std::runtime_error("Key not found");
     }
 
+    /**
+     * @brief Single-lookup find returning a pointer to the value, or nullptr if not found.
+     */
+    const Value* find(const Key& key) const {
+        if (_capacity == 0) return nullptr;
+        size_t idx = hasher(key) & _mask;
+        while (occupied[idx]) {
+            if (keys[idx] == key) {
+                return &values[idx];
+            }
+            idx = (idx + 1) & _mask;
+        }
+        return nullptr;
+    }
+
+    /** @return The number of elements currently stored. */
+    size_t size() const { return _size; }
+
 private:
     std::vector<Key> keys;
     std::vector<Value> values;

@@ -19,7 +19,7 @@ public:
     using ValueType = int8_t; // 8-bit integer is enough for n <= 24
 
     /** @brief Default constructor (empty permutation). */
-    Permutation() : n(0), length_(-1) {}
+    Permutation() : n(0) {}
 
     /** @brief Construct directly from raw pointer (optimized). 
      *  Assume data checks MAX_SIZE externally or trusted source. 
@@ -41,10 +41,10 @@ public:
      */
     Permutation(const std::vector<int>& data_vec);
 
-    /** @retutn Constant iterator to the beginning. */
+    /** @return Constant iterator to the beginning. */
     const ValueType* begin() const { return data.data(); }
 
-    /** @retutn Constant iterator to the end. */
+    /** @return Constant iterator to the end. */
     const ValueType* end() const { return data.data() + n; }
 
     /** @return The size of the permutation. */

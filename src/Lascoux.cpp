@@ -35,8 +35,7 @@ std::vector<Node> build_tree_from_perms(const Permutation& x_perm, const Permuta
     int n = x_perm.size();
 
     if (n != w_perm.size()) {
-        std::cerr << "Error: permutations of different sizes\n";
-        return {};
+        throw std::invalid_argument("Lascoux::build_tree_from_perms: permutations of different sizes");
     }
 
     // Step 1: Build Lehmer code and lambda sequence from x
@@ -274,10 +273,10 @@ bool has_3412_pattern(const Permutation& p) {
     if (n < 4) return false;
 
     // Precompute the maximum value to the left that is less than the current value
-    // left_max_lt[j] = max_{i<j, w[i] < w[j]} w[i], or 0 if none
-    std::vector<int> left_max_lt(n, 0);
+    // left_max_lt[j] = max_{i<j, w[i] < w[j]} w[i], or -1 if none
+    std::vector<int> left_max_lt(n, -1);
     for (int j = 0; j < n; ++j) {
-        int mx = 0;
+        int mx = -1;
         int wj = p[j];
         for (int i = 0; i < j; ++i) {
             int wi = p[i];
@@ -297,7 +296,7 @@ bool has_3412_pattern(const Permutation& p) {
         int wk = p[k];
         for (int j = 1; j < k; ++j) {
             int T = left_max_lt[j];
-            if (T <= wk + 1) continue;
+            if (T < 0 || T <= wk + 1) continue;
             // Check if there is a valid 'l' element completing the pattern
             if (pref[T - 1] - pref[wk] > 0) return true;
         }

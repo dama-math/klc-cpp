@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
+#include <cassert>
 
 /**
  * @brief Manages a pool of unique Polynomial objects to reduce memory usage.
@@ -49,6 +50,7 @@ public:
      * @return A constant reference to the requested polynomial.
      */
     const Polynomial& get_poly(IdType id) const {
+        assert(id < pool.size() && "PolynomialPool: invalid polynomial ID");
         return pool[id];
     }
     

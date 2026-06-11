@@ -1,7 +1,8 @@
 #include "Polynomial.hpp"
 #include <algorithm>
 #include <iostream>
-#include <cstring> // for memcpy
+#include <cstring>  // for memcpy
+#include <cassert>
 
 // Constructors
 Polynomial::Polynomial() : deg(-1), storage(std::in_place_type<SmallStorage>) {
@@ -25,7 +26,7 @@ Polynomial::Polynomial(const std::vector<long long>& coeffs) {
 
 // Accessors
 int Polynomial::degree() const {
-    return (deg < 0) ? 0 : deg; 
+    return deg;
 }
 
 long long Polynomial::get_coeff(int i) const {
@@ -139,6 +140,13 @@ Polynomial& Polynomial::operator*=(const Polynomial& rhs) {
         deg = -1;
         return *this;
     }
+
+    // Guard against self-multiplication (p *= p) which would invalidate
+    // the rhs data pointer when storage is modified in-place.
+    if (this == &rhs) {
+        Polynomial copy(rhs);
+        return *this *= copy;
+    }
     
     int new_deg = deg + rhs.deg;
     int needed_size = new_deg + 1;
@@ -186,7 +194,8 @@ Polynomial Polynomial::operator*(const Polynomial& rhs) const {
 }
 
 Polynomial Polynomial::shift(int amount) const {
-    if (amount <= 0) return *this;
+    assert(amount >= 0 && "shift amount must be non-negative");
+    if (amount == 0) return *this;
     if (is_zero()) return *this;
 
     Polynomial res;
@@ -270,7 +279,7 @@ std::string Polynomial::to_string_simple() const {
 }
 
 bool Polynomial::is_zero() const {
-    return degree() == -1 || deg == -1;
+    return deg < 0;
 }
 
 std::size_t Polynomial::hash() const {

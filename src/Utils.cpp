@@ -69,7 +69,7 @@ Permutation get_pattern(std::vector<int> vec) {
     std::vector<int> res;
     for (int x : vec) {
         // Find the relative rank of each element
-        res.push_back(std::lower_bound(sorted.begin(), sorted.end(), x) - sorted.begin() + 1);
+        res.push_back(static_cast<int>(std::lower_bound(sorted.begin(), sorted.end(), x) - sorted.begin()));
     }
     return Permutation(res);
 }

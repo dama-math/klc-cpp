@@ -10,58 +10,6 @@
 #include <utility> // For std::pair
 
 /**
- * @brief Hash function object for std::vector<int>.
- */
-struct VectorHasher {
-    std::size_t operator()(const std::vector<int>& v) const {
-        std::size_t seed = v.size();
-        for(int i : v) {
-            // Apply a strong bit avalanche
-            i = ((i >> 16) ^ i) * 0x45d9f3b;
-            i = ((i >> 16) ^ i) * 0x45d9f3b;
-            i = (i >> 16) ^ i;
-            seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        }
-        return seed;
-    }
-};
-
-/**
- * @brief Hash function object for std::pair of std::vector<int>.
- */
-struct VectorPairHasher {
-    std::size_t operator()(const std::pair<std::vector<int>, std::vector<int>>& p) const {
-        auto h1 = VectorHasher{}(p.first);
-        auto h2 = VectorHasher{}(p.second);
-        return h1 ^ (h2 << 1);
-    }
-};
-
-/**
- * @brief Ultra-fast hash function object for packed pairs.
- * 
- * Used for aggressively hashing permutation pairs represented as 64-bit integers.
- */
-struct FastHasher {
-    std::size_t operator()(const std::pair<PackedInt, PackedInt>& p) const {
-#ifdef USE_128BIT_PACKING
-        uint64_t f_low = (uint64_t)p.first;
-        uint64_t f_high = (uint64_t)(p.first >> 64);
-        uint64_t s_low = (uint64_t)p.second;
-        uint64_t s_high = (uint64_t)(p.second >> 64);
-        
-        uint64_t h = f_low ^ f_high ^ (s_low + 0x9e3779b9 + (f_low << 6) + (f_low >> 2)) ^ s_high;
-#else
-        uint64_t h = p.first ^ (p.second + 0x9e3779b9 + (p.first << 6) + (p.first >> 2));
-#endif
-        h = (h ^ (h >> 30)) * 0xbf58476d1ce4e5b9;
-        h = (h ^ (h >> 27)) * 0x94d049bb133111eb;
-        h = h ^ (h >> 31);
-        return h;
-    }
-};
-
-/**
  * @brief High-performance Kazhdan-Lusztig polynomial calculator.
  * 
  * Implements various algorithms including the standard recursive formula and

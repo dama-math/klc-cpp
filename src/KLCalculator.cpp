@@ -197,7 +197,7 @@ Polynomial KLPolynomialCalculator::calculate_kl(const Permutation& x, const Perm
     
     // Polynomial is zero if x is not less than or equal to w in the Bruhat order
     if (!Bruhat::is_bruhat_less_than(x, w)) {
-        return Polynomial({0});
+        return Polynomial();
     }
 
     // Polynomial is 1 if the length difference is 0, 1, or 2
@@ -247,7 +247,7 @@ void KLPolynomialCalculator::precompute_kl_polynomials(int max_n) {
 
 Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w, bool already_bruhat_checked) {
     if (!already_bruhat_checked && !Bruhat::is_bruhat_less_than(x, w)) {
-        return Polynomial({0});
+        return Polynomial();
     }
 
     if (w.length() - x.length() <= 2) {
@@ -263,9 +263,8 @@ Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w
 
     // Check the cache
     const auto key = std::make_pair(x.pack(), w.pack());
-    if (cache.count(key)) {
-        uint32_t id = cache.at(key);
-        return poly_pool.get_poly(id);
+    if (const auto* cached_id = cache.find(key)) {
+        return poly_pool.get_poly(*cached_id);
     }
 
     // Find the first descent in w
@@ -413,8 +412,8 @@ long long KLPolynomialCalculator::get_mu_recursive(Permutation x, Permutation w,
     }
 
     const auto key = std::make_pair(x.pack(), w.pack());
-    if (mu_cache.count(key)) {
-        return mu_cache.at(key);
+    if (const auto* cached_mu = mu_cache.find(key)) {
+        return *cached_mu;
     }
 
     int s_index = -1;
