@@ -79,7 +79,6 @@ make clean
 | `--random` | `n [num] [seed]` | Runs `num` random KL calculations in $S_n$. |
 | `--file` | `filename` | Processes permutation pairs from a file. |
 | `--verify` | `filename` | Verifies calculations against expected results in a file. |
-| `--cyclic` | `n` | Runs a cyclic permutation test for $S_n$. |
 
 ### Examples
 
@@ -115,7 +114,7 @@ Verify against a file:
 
 - Gregory S. Warrington, original C implementation ([official webpage](https://gswarrin.w3.uvm.edu/research/klc/klc.html))
 - A. Lascoux, *Polynômes de Kazhdan-Lusztig pour les variétés de Schubert vexillaires*, C. R. Acad. Sci. Paris Sér. I Math. 321 (1995), 667–670.
-- Sara Billey and V. Lakshmibai, *Singular Loci of Schubert Varieties*, Graduate Texts in Mathematics, 2000 (Section 6.3.28).
+- Sara Billey and V. Lakshmibai, *Singular Loci of Schubert Varieties*, Vol. 182. Springer Science & Business Media, 2000 (Section 6.3.28).
 
 ---
 
