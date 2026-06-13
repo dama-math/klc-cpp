@@ -42,9 +42,6 @@ bool is_extremal_pair(const std::vector<int>& x_data, const std::vector<int>& w_
 /**
  * @brief Checks if permutation x is less than or equal to permutation w in the Bruhat order.
  * 
- * This is a high-performance implementation utilizing the rank matrix algorithm
- * optimized for smaller permutations.
- * 
  * @param x The first permutation.
  * @param w The second permutation.
  * @return True if x <= w in the Bruhat order, false otherwise.

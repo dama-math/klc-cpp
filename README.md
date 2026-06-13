@@ -3,6 +3,7 @@
 A C++ program for calculating Kazhdan-Lusztig (KL) polynomials $P_{x,w}(q)$ for permutations in symmetric groups $S_n$.
 
 Based on Gregory S. Warrington's original C implementation ([Warrington's KLC page](https://gswarrin.w3.uvm.edu/research/klc/klc.html)).
+The algorithm is explained in his paper *Equivalence classes for the mu-coefficient of Kazhdan-Lusztig polynomials in $S_n$* ([arXiv:1010.3961](https://arxiv.org/abs/1010.3961)).
 
 ---
 
@@ -130,6 +131,7 @@ Verify against a file:
 ## References
 
 - Gregory S. Warrington, original C implementation ([official webpage](https://gswarrin.w3.uvm.edu/research/klc/klc.html))
+- Gregory S. Warrington, *Equivalence classes for the mu-coefficient of Kazhdan-Lusztig polynomials in $S_n$*, Experimental Mathematics 20 (2011), no. 4, 457–466.
 - A. Lascoux, *Polynômes de Kazhdan-Lusztig pour les variétés de Schubert vexillaires*, C. R. Acad. Sci. Paris Sér. I Math. 321 (1995), 667–670.
 - Sara Billey and Venkatramani Lakshmibai, *Singular Loci of Schubert Varieties*, Progress in Mathematics, vol. 182, Birkhäuser/Springer, 2000. — Contains an accessible treatment of Lascoux's algorithm (Section 6.3.28).
 
