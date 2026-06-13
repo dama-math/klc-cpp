@@ -23,10 +23,10 @@ constexpr ValueType REMOVED = -1;
  * @param n Size of the permutations.
  * @return True if the inner permutation 'x' was modified, false otherwise.
  */
-bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
-    if (n <= 1) return false;
+int make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
+    if (n <= 1) return 0;
     bool changed = true;
-    bool changed_x = false;
+    int swaps_made = 0;
     
     ValueType x_inv[32];
     ValueType w_inv[32];
@@ -46,6 +46,7 @@ bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
                 std::swap(x_data[i], x_data[i + 1]);
                 std::swap(x_inv[val1], x_inv[val2]);
                 changed = true;
+                swaps_made++;
             }
         }
         
@@ -54,12 +55,11 @@ bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
                 std::swap(x_data[x_inv[i]], x_data[x_inv[i + 1]]);
                 std::swap(x_inv[i], x_inv[i + 1]);
                 changed = true;
+                swaps_made++;
             }
         }
-        
-        if (changed) changed_x = true;
     }
-    return changed_x;
+    return swaps_made;
 }
 
 /**
@@ -137,16 +137,32 @@ void flatten_inplace(ValueType* x_data, ValueType* w_data, int& n) {
 
 // --- Public API Functions ---
 
-void reduce(Permutation& x, Permutation& w) {
+bool reduce(Permutation& x, Permutation& w) {
     auto* x_data = x.data_ptr_mut();
     auto* w_data = w.data_ptr_mut();
     int n = x.size();
 
     bool changed = true;
     bool modified = false;
+    bool originally_ep = true;
+    bool first_iteration = true;
+    
+    int total_x_swaps = 0;
+    bool tilde_applied = false;
+    
+    int initial_x_len = x.has_cached_length() ? x.length() : -1;
     
     while (changed) {
-        if (make_ep_inplace(x_data, w_data, n)) modified = true;
+        int swaps = make_ep_inplace(x_data, w_data, n);
+        if (first_iteration && swaps > 0) {
+            originally_ep = false;
+        }
+        first_iteration = false;
+        
+        if (swaps > 0) {
+            modified = true;
+            total_x_swaps += swaps;
+        }
         
         int removed_count = tilde_inplace(x_data, w_data, n);
         if (removed_count > 0) {
@@ -156,6 +172,7 @@ void reduce(Permutation& x, Permutation& w) {
             w.set_size(n);
             changed = true;
             modified = true;
+            tilde_applied = true;
         } else {
             changed = false;
         }
@@ -164,9 +181,18 @@ void reduce(Permutation& x, Permutation& w) {
     // Conservatively invalidate length caches for both permutations
     // since make_ep_inplace can modify x data and tilde/flatten can modify both.
     if (modified) {
-        x.reset_length_cache();
-        w.reset_length_cache();
+        if (tilde_applied) {
+            x.reset_length_cache();
+            w.reset_length_cache();
+        } else {
+            if (initial_x_len != -1) {
+                x.set_cached_length(initial_x_len + total_x_swaps);
+            } else {
+                x.reset_length_cache();
+            }
+        }
     }
+    return originally_ep;
 }
 
 bool is_extremal_pair(const Permutation& x, const Permutation& w) {

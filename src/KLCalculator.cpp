@@ -104,10 +104,10 @@ public:
      */
     template <typename Callback>
     void search(Callback callback) {
-        std::array<int, MAX_N_OPT> curr_col{};
+        std::array<int8_t, MAX_N_OPT> curr_col{};
         curr_col.fill(0); 
         
-        std::array<int, MAX_N_OPT> z_path;
+        std::array<int8_t, MAX_N_OPT> z_path;
         
         dfs(0, 0, curr_col, z_path, callback);
     }
@@ -134,8 +134,8 @@ private:
      */
     template <typename Callback>
     void dfs(int depth, unsigned int used_mask, 
-             const std::array<int, MAX_N_OPT>& prev_col, 
-             std::array<int, MAX_N_OPT>& z_path,
+             std::array<int8_t, MAX_N_OPT>& prev_col, 
+             std::array<int8_t, MAX_N_OPT>& z_path,
              Callback& callback) {
         
         if (depth == n) {
@@ -152,10 +152,10 @@ private:
 
         int max_allowed_i = n - 1;
         if (depth > 0 && ws_rds[depth - 1]) {
-            max_allowed_i = std::min(max_allowed_i, z_path[depth - 1]);
+            max_allowed_i = std::min(max_allowed_i, static_cast<int>(z_path[depth - 1]));
         }
         if (s_index != -1 && depth == s_index + 1) {
-            max_allowed_i = std::min(max_allowed_i, z_path[s_index]);
+            max_allowed_i = std::min(max_allowed_i, static_cast<int>(z_path[s_index]));
         }
 
         unsigned int max_mask = (1u << (max_allowed_i + 1)) - 1;
@@ -183,11 +183,13 @@ private:
             if (!bruhat_ok) continue;
 
             // Update column counts and recurse
-            std::array<int, MAX_N_OPT> curr_col = prev_col;
-            for (int k = 0; k <= i; ++k) curr_col[k]++;
-            z_path[depth] = i;
+            for (int k = 0; k <= i; ++k) prev_col[k]++;
+            z_path[depth] = static_cast<int8_t>(i);
             
-            dfs(depth + 1, used_mask | mask_bit, curr_col, z_path, callback);
+            dfs(depth + 1, used_mask | mask_bit, prev_col, z_path, callback);
+            
+            // Undo column counts
+            for (int k = 0; k <= i; ++k) prev_col[k]--;
         }
     }
 };
@@ -279,12 +281,35 @@ Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w
         return poly_pool.get_poly(*cached_id);
     }
 
-    // Find the first descent in w
+    // Cache-aware descent selection
     int s_index = -1;
+    uint64_t w_packed = w.pack();
+    uint64_t x_packed = x.pack();
+    
+    // Check if any descent leads to a cached (x, ws) pair
     for (int i = 0; i < w.size() - 1; ++i) {
         if (w[i] > w[i + 1]) {
-            s_index = i;
-            break;
+            uint64_t ws_packed = w_packed;
+            uint64_t val_i = w[i];
+            uint64_t val_ip1 = w[i + 1];
+            ws_packed &= ~((0xFull << (4 * i)) | (0xFull << (4 * (i + 1))));
+            ws_packed |= (val_ip1 << (4 * i)) | (val_i << (4 * (i + 1)));
+            
+            const auto key = std::make_pair(x_packed, ws_packed);
+            if (cache.find(key) != nullptr) {
+                s_index = i;
+                break;
+            }
+        }
+    }
+
+    // Fallback to the first descent
+    if (s_index == -1) {
+        for (int i = 0; i < w.size() - 1; ++i) {
+            if (w[i] > w[i + 1]) {
+                s_index = i;
+                break;
+            }
         }
     }
 
@@ -409,11 +434,8 @@ long long KLPolynomialCalculator::get_mu_recursive(Permutation x, Permutation w,
     if (len_diff <= 0 || len_diff % 2 == 0) return 0;
     if (len_diff == 1) return 1;
 
-    // Extracted optimization: must be an extremal pair
-    if (!Bruhat::is_extremal_pair(x, w)) return 0;
-
-    // Apply pair reduction
-    Bruhat::reduce(x, w);
+    // Apply pair reduction and check if originally an extremal pair
+    if (!Bruhat::reduce(x, w)) return 0;
 
     int reduced_len_diff = w.length() - x.length();
     if (reduced_len_diff <= 0 || reduced_len_diff % 2 == 0) return 0;

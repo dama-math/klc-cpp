@@ -17,7 +17,7 @@ namespace Bruhat {
  * @param x The first permutation (will be modified in place).
  * @param w The second permutation (will be modified in place).
  */
-void reduce(Permutation& x, Permutation& w);
+bool reduce(Permutation& x, Permutation& w);
 
 /**
  * @brief Checks if the permutations (x, w) form an extremal pair.

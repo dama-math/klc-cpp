@@ -75,6 +75,10 @@ public:
     /** @brief Resets the cached length value. */
     void reset_length_cache() { length_ = -1; }
     
+    bool has_cached_length() const { return length_ != -1; }
+    
+    void set_cached_length(int len) { length_ = len; }
+
     /** @brief Sets size manually (use with caution when writing to data_ptr_mut directly). */
     void set_size(int new_n) { 
         if (new_n > MAX_SIZE) throw std::length_error("Permutation size exceeds MAX_SIZE");
