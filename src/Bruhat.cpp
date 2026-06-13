@@ -24,15 +24,13 @@ constexpr ValueType REMOVED = -1;
  * @return True if the inner permutation 'x' was modified, false otherwise.
  */
 bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
-    if (n == 0) return false;
+    if (n <= 1) return false;
     bool changed = true;
     bool changed_x = false;
     
-    // Fixed-size stack buffers for calculating inverses (max size 32)
     ValueType x_inv[32];
     ValueType w_inv[32];
     
-    // Compute inverses of the permutations
     for (int i = 0; i < n; ++i) {
         x_inv[x_data[i]] = i;
         w_inv[w_data[i]] = i;
@@ -41,7 +39,6 @@ bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
     while (changed) {
         changed = false;
         
-        // Forward pass
         for (int i = 0; i < n - 1; ++i) {
             if (w_data[i] > w_data[i + 1] && x_data[i] < x_data[i + 1]) {
                 int val1 = x_data[i];
@@ -52,7 +49,6 @@ bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
             }
         }
         
-        // Inverse pass
         for (int i = 0; i < n - 1; ++i) {
             if (w_inv[i] > w_inv[i + 1] && x_inv[i] < x_inv[i + 1]) {
                 std::swap(x_data[x_inv[i]], x_data[x_inv[i + 1]]);
@@ -77,33 +73,31 @@ bool make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
  * @return The number of elements successfully marked for removal.
  */
 int tilde_inplace(ValueType* x_data, ValueType* w_data, int n) {
-    if (n == 0) return 0;
-
-    // Frequency/difference array tracking value coverage (range 0..31)
-    int dxw_row[32] = {0}; 
+    if (n <= 1) return 0;
     int removed_count = 0;
 
     for (int i = 0; i < n; ++i) {
-        if (x_data[i] < w_data[i]) {
-            for (int j = x_data[i]; j < w_data[i]; ++j) {
-                dxw_row[j]++;
-            }
-        } else {
-            for (int j = w_data[i]; j < x_data[i]; ++j) {
-                dxw_row[j]--;
-            }
-        }
-        
-        // Elements that are identical and have no overlapping intervals can be removed
         if (x_data[i] == w_data[i]) {
-            if (dxw_row[x_data[i]] == 0) {
+            int x = x_data[i];
+            int dxw = 0;
+            // Compute dxw_row[x] by looking at all previous elements
+            for (int j = 0; j < i; ++j) {
+                int xj = x_data[j];
+                int wj = w_data[j];
+                if (xj <= x && x < wj) {
+                    dxw++;
+                } else if (wj <= x && x < xj) {
+                    dxw--;
+                }
+            }
+            // Elements that are identical and have no overlapping intervals can be removed
+            if (dxw == 0) {
                 x_data[i] = REMOVED;
                 w_data[i] = REMOVED;
                 removed_count++;
             }
         }
     }
-
     return removed_count;
 }
 
@@ -120,30 +114,19 @@ int tilde_inplace(ValueType* x_data, ValueType* w_data, int n) {
 void flatten_inplace(ValueType* x_data, ValueType* w_data, int& n) {
     if (n == 0) return;
 
-    // Map to keep track of active values
-    int keep[32] = {0}; 
-
-    for(int i = 0; i < n; ++i) {
-        int v = x_data[i];
-        if (v >= 0 && v < 32) keep[v] = 1; 
+    uint32_t active_vals = 0;
+    for (int i = 0; i < n; ++i) {
+        if (x_data[i] != REMOVED) {
+            active_vals |= (1u << x_data[i]);
+            active_vals |= (1u << w_data[i]);
+        }
     }
-
-    int value_map[32];
-    std::fill(std::begin(value_map), std::end(value_map), REMOVED);
-
-    int next = 0;
-    // Build a re-indexing map for remaining valid values
-    for (int val = 0; val < n; ++val) {
-        if (keep[val]) value_map[val] = next++;
-    }
-
+    
     int write_idx = 0;
-    // Compacting pass
-    for (int read_idx = 0; read_idx < n; ++read_idx) {
-        int xv = x_data[read_idx];
-        if (xv != REMOVED) {
-            x_data[write_idx] = static_cast<ValueType>(value_map[xv]);
-            w_data[write_idx] = static_cast<ValueType>(value_map[w_data[read_idx]]);
+    for (int i = 0; i < n; ++i) {
+        if (x_data[i] != REMOVED) {
+            x_data[write_idx] = static_cast<ValueType>(__builtin_popcount(active_vals & ((1u << x_data[i]) - 1)));
+            w_data[write_idx] = static_cast<ValueType>(__builtin_popcount(active_vals & ((1u << w_data[i]) - 1)));
             ++write_idx;
         }
     }
@@ -221,8 +204,6 @@ bool is_bruhat_less_than(const Permutation& x, const Permutation& w) {
     int n = x.size();
     if (n == 0) return true;
     
-    // Optimized implementation for n <= 32 using fixed arrays
-    // Tracks the difference of the rank matrices: r_x(i, j) - r_w(i, j)
     int8_t diff_row[32] = {0};
 
     const auto* x_ptr = x.begin();
@@ -232,13 +213,14 @@ bool is_bruhat_less_than(const Permutation& x, const Permutation& w) {
         int xi = x_ptr[i];
         int wi = w_ptr[i];
         
-        // Branchless update loop optimized for basic processor instructions
-        for (int j = 0; j < n; ++j) {
-           // diff(i, j) = diff(i-1, j) + (j >= xi) - (j >= wi)
-           // Boolean comparisons natively cast to 0 or 1
-           diff_row[j] += (j >= xi) - (j >= wi);
-           
-           if (diff_row[j] < 0) return false;
+        if (xi < wi) {
+            for (int j = xi; j < wi; ++j) {
+                diff_row[j]++;
+            }
+        } else if (xi > wi) {
+            for (int j = wi; j < xi; ++j) {
+                if (--diff_row[j] < 0) return false;
+            }
         }
     }
 
@@ -271,16 +253,20 @@ bool is_bruhat_less_than(const std::vector<int>& x_data, const std::vector<int>&
     int n = x_data.size();
     if (n == 0) return true;
 
-    // Use the same efficient diff-row technique as the Permutation overload
     std::vector<int> diff_row(n, 0);
 
     for (int i = 0; i < n; ++i) {
         int xi = x_data[i];
         int wi = w_data[i];
         
-        for (int j = 0; j < n; ++j) {
-            diff_row[j] += (j >= xi) - (j >= wi);
-            if (diff_row[j] < 0) return false;
+        if (xi < wi) {
+            for (int j = xi; j < wi; ++j) {
+                diff_row[j]++;
+            }
+        } else if (xi > wi) {
+            for (int j = wi; j < xi; ++j) {
+                if (--diff_row[j] < 0) return false;
+            }
         }
     }
 

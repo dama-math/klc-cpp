@@ -71,12 +71,16 @@ public:
         // Precompute right and left descent information for ws
         ws_rds.fill(false);
         ws_lds.fill(false);
+        ws_lds_mask = 0;
         
         Permutation ws_inv = ws.inverse();
         
         for (int i = 0; i < n - 1; ++i) {
             if (ws[i] > ws[i + 1]) ws_rds[i] = true;
-            if (ws_inv[i] > ws_inv[i + 1]) ws_lds[i] = true;
+            if (ws_inv[i] > ws_inv[i + 1]) {
+                ws_lds[i] = true;
+                ws_lds_mask |= (1u << i);
+            }
         }
 
         // Initialize row pointers for fast direct memory access
@@ -100,12 +104,12 @@ public:
      */
     template <typename Callback>
     void search(Callback callback) {
-        std::array<int, MAX_N_OPT> prev_col{};
-        prev_col.fill(0); 
+        std::array<int, MAX_N_OPT> curr_col{};
+        curr_col.fill(0); 
         
         std::array<int, MAX_N_OPT> z_path;
         
-        dfs(0, 0, prev_col, z_path, callback);
+        dfs(0, 0, curr_col, z_path, callback);
     }
 
 private:
@@ -123,6 +127,7 @@ private:
     const int* ws_rx_ptrs[MAX_N_OPT]{};
     int x_data[MAX_N_OPT]{};
     int ws_data[MAX_N_OPT]{};
+    unsigned int ws_lds_mask = 0;
 
     /**
      * @brief The core recursive DFS function.
@@ -145,36 +150,43 @@ private:
         const int* ws_rx_k = ws_rx_ptrs[depth];
         const int* x_rx_k = x_rx_ptrs[depth];
 
-        for (int i = 0; i < n; ++i) {
+        int max_allowed_i = n - 1;
+        if (depth > 0 && ws_rds[depth - 1]) {
+            max_allowed_i = std::min(max_allowed_i, z_path[depth - 1]);
+        }
+        if (s_index != -1 && depth == s_index + 1) {
+            max_allowed_i = std::min(max_allowed_i, z_path[s_index]);
+        }
+
+        unsigned int max_mask = (1u << (max_allowed_i + 1)) - 1;
+        unsigned int rejected_lds = ws_lds_mask & (~used_mask >> 1);
+        unsigned int avail_mask = ~used_mask & max_mask & ~rejected_lds;
+
+        while (avail_mask) {
+            int i = __builtin_ctz(avail_mask);
+            avail_mask &= avail_mask - 1; // clear lowest set bit
+            
             unsigned int mask_bit = (1u << i);
-            if (used_mask & mask_bit) continue;
-
-            // Prune branches based on descent constraints
-            if (depth > 0) {
-                if (z_path[depth - 1] < i && ws_rds[depth - 1]) continue;
-            }
-            if (i < n - 1 && !(used_mask & (1u << (i + 1))) && ws_lds[i]) continue;
-            if (depth == s_index + 1 && z_path[s_index] < i) continue;
-
-            // Update column counts
-            std::array<int, MAX_N_OPT> curr_col = prev_col;
-            for (int k = 0; k <= i; ++k) curr_col[k]++;
 
             bool bruhat_ok = true;
             
             // Check Bruhat constraints against ws
             for (int j = ws_k + 1; j <= i; ++j) {
-                if (ws_rx_k[j] < curr_col[j]) { bruhat_ok = false; break; }
+                if (ws_rx_k[j] <= prev_col[j]) { bruhat_ok = false; break; }
             }
             if (!bruhat_ok) continue;
 
             // Check Bruhat constraints against x
             for (int j = i + 1; j <= x_k; ++j) {
-                if (curr_col[j] < x_rx_k[j]) { bruhat_ok = false; break; }
+                if (prev_col[j] < x_rx_k[j]) { bruhat_ok = false; break; }
             }
             if (!bruhat_ok) continue;
 
+            // Update column counts and recurse
+            std::array<int, MAX_N_OPT> curr_col = prev_col;
+            for (int k = 0; k <= i; ++k) curr_col[k]++;
             z_path[depth] = i;
+            
             dfs(depth + 1, used_mask | mask_bit, curr_col, z_path, callback);
         }
     }

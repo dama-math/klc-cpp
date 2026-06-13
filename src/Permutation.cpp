@@ -64,47 +64,28 @@ int Permutation::length() const {
         return length_;
     }
 
-#if defined(__AVX2__)
-    // Vectorized implementation using AVX2 for N <= 32
-    // Counts pairs (i, j) such that i < j and data[i] > data[j] (inversions)
-    if (n <= 32) {
-        // Load the 32-byte data array into a 256-bit register
-        // Out-of-bounds elements (if n < 32) are safely ignored using the valid_range_mask
-        __m256i vec = _mm256_loadu_si256((const __m256i*)data.data());
-        
-        int inv_count = 0;
-        
-        for (int i = 0; i < n - 1; ++i) {
-             // Broadcast data[i] to all 32 lanes
-             __m256i val_i = _mm256_set1_epi8(data[i]);
-             
-             // Compare data[i] > data[j] for all j simultaneously
-             // _mm256_cmpgt_epi8 produces 0xFF where true, and 0x00 where false
-             __m256i mask = _mm256_cmpgt_epi8(val_i, vec);
-             
-             // Extract the highest bit of each 8-bit lane into a 32-bit integer mask
-             unsigned int bitmask = _mm256_movemask_epi8(mask);
-             
-             // Create a mask to only consider valid indices j where j > i and j < n
-             unsigned int valid_range_mask = static_cast<unsigned int>(((1ULL << n) - 1) & ~((1ULL << (i + 1)) - 1));
-             
-             // Count the number of inversions for data[i]
-             inv_count += __builtin_popcount(bitmask & valid_range_mask);
-        }
-        length_ = inv_count;
-        return length_;
-    }
-#endif
-
-    // Fallback to standard scalar calculation if AVX2 is not available or N > 32
     int inversions = 0;
-    for (int i = 0; i < n; ++i) {
-        for (int j = i + 1; j < n; ++j) {
-            if (data[i] > data[j]) {
-                inversions++;
+    if (n <= 32) {
+        // O(n) bitmask algorithm for N <= 32
+        uint32_t seen = 0;
+        for (int i = 0; i < n; ++i) {
+            int v = data[i];
+            if (v < 31) {
+                inversions += __builtin_popcount(seen >> (v + 1));
+            }
+            seen |= (1u << v);
+        }
+    } else {
+        // Fallback to standard scalar calculation if N > 32
+        for (int i = 0; i < n; ++i) {
+            for (int j = i + 1; j < n; ++j) {
+                if (data[i] > data[j]) {
+                    inversions++;
+                }
             }
         }
     }
+    
     length_ = inversions;
     return length_;
 }
