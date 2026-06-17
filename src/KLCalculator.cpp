@@ -281,36 +281,17 @@ Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w
         return poly_pool.get_poly(*cached_id);
     }
 
-    // Cache-aware descent selection
-    int s_index = -1;
-    uint64_t w_packed = w.pack();
-    uint64_t x_packed = x.pack();
-    
-    // Check if any descent leads to a cached (x, ws) pair
-    for (int i = 0; i < w.size() - 1; ++i) {
-        if (w[i] > w[i + 1]) {
-            uint64_t ws_packed = w_packed;
-            uint64_t val_i = w[i];
-            uint64_t val_ip1 = w[i + 1];
-            ws_packed &= ~((0xFull << (4 * i)) | (0xFull << (4 * (i + 1))));
-            ws_packed |= (val_ip1 << (4 * i)) | (val_i << (4 * (i + 1)));
-            
-            const auto key = std::make_pair(x_packed, ws_packed);
-            if (cache.find(key) != nullptr) {
-                s_index = i;
-                break;
-            }
-        }
-    }
+    int s_index  = -1;
+    int pos_zero = -1;
+    int pos_max  = -1;
 
-    // Fallback to the first descent
-    if (s_index == -1) {
-        for (int i = 0; i < w.size() - 1; ++i) {
-            if (w[i] > w[i + 1]) {
-                s_index = i;
-                break;
-            }
-        }
+    for (int i = 0; i < w.size(); ++i) {
+        if (w[i] == 0)             pos_zero = i;
+        if (w[i] == w.size() - 1)  pos_max  = i;
+    }
+    
+    if (pos_zero > 0) {
+        s_index = (pos_max > w.size() - 1 - pos_zero) ? pos_max : (pos_zero - 1);
     }
 
     if (s_index == -1) {
@@ -450,12 +431,17 @@ long long KLPolynomialCalculator::get_mu_recursive(Permutation x, Permutation w,
         return *cached_mu;
     }
 
-    int s_index = -1;
-    for (int i = 0; i < w.size() - 1; ++i) {
-        if (w[i] > w[i + 1]) {
-            s_index = i;
-            break;
-        }
+    int s_index  = -1;
+    int pos_zero = -1;
+    int pos_max  = -1;
+
+    for (int i = 0; i < w.size(); ++i) {
+        if (w[i] == 0)             pos_zero = i;
+        if (w[i] == w.size() - 1)  pos_max  = i;
+    }
+
+    if (pos_zero > 0) {
+        s_index = (pos_max > w.size() - 1 - pos_zero) ? pos_max : (pos_zero - 1);
     }
 
     if (s_index == -1) {

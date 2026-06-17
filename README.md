@@ -76,7 +76,7 @@ Measured on AMD Ryzen 5 9600X:
 
 ```bash
 time ./klc_cpp 0123456789a 789a3456012
-# ~40 seconds
+# ~35 seconds
 ```
 
 ---
