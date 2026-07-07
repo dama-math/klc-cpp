@@ -6,6 +6,7 @@
 #include <iostream>
 #include <array>
 #include <functional>
+#include <bit>
 
 namespace {
 
@@ -163,7 +164,7 @@ private:
         unsigned int avail_mask = ~used_mask & max_mask & ~rejected_lds;
 
         while (avail_mask) {
-            int i = __builtin_ctz(avail_mask);
+            int i = std::countr_zero(avail_mask);
             avail_mask &= avail_mask - 1; // clear lowest set bit
             
             unsigned int mask_bit = (1u << i);

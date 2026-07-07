@@ -3,16 +3,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-// Check for AVX2 support via compiler flags or macros
-#if defined(__AVX2__)
-#include <immintrin.h>
-#endif
-
-// Helper to count set bits (population count) for MSVC
-#ifdef _MSC_VER
-#include <intrin.h>
-#define __builtin_popcount __popcnt
-#endif
+#include <bit>
 
 Permutation::Permutation(const ValueType* data_ptr, int n_val) {
     if (n_val > MAX_SIZE) throw std::length_error("Permutation size exceeds maximum allowed size");
@@ -71,7 +62,7 @@ int Permutation::length() const {
         for (int i = 0; i < n; ++i) {
             int v = data[i];
             if (v < 31) {
-                inversions += __builtin_popcount(seen >> (v + 1));
+                inversions += std::popcount(seen >> (v + 1));
             }
             seen |= (1u << v);
         }
@@ -197,6 +188,8 @@ std::vector<int> Permutation::from_one_line_notation(const std::string& notation
             d.push_back(c - '0');
         } else if (c >= 'a' && c <= 'z') {
             d.push_back(c - 'a' + 10);
+        } else {
+            throw std::invalid_argument(std::string("Invalid character in permutation string: ") + c);
         }
     }
     

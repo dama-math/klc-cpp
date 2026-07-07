@@ -1,11 +1,6 @@
-# --- Compiler selection (default: clang++) ---
-# Use `make COMPILER=gcc` or `make CXX=g++` to switch to g++.
-COMPILER ?=
-ifeq ($(COMPILER),gcc)
-	CXX := g++
-else
-	CXX := clang++
-endif
+# --- Compiler selection (default: g++) ---
+# Use `make CXX=clang++` to switch to clang++.
+CXX ?= g++
 
 CXXFLAGS = -std=c++20 -Wall -O3 -mtune=native -march=native -funroll-loops -Iinclude
 

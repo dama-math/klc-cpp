@@ -14,7 +14,7 @@ The algorithm is explained in his paper *Equivalence classes for the mu-coeffici
 - **Compile-time integer packing:**
   - **64-bit (default):** Packs elements into a `uint64_t` (4 bits/element), supporting $n \le 16$.
   - **128-bit:** Packs elements into `__uint128_t` (5 bits/element) when compiled with `BIG_N=1`, supporting $n \le 24$.
-- **AVX2 inversion counting:** Uses SIMD vectorization for Coxeter length calculation when the host CPU supports it.
+- **Fast inversion counting:** Uses hardware population count (`POPCNT`) for extremely fast Coxeter length calculation.
 - **Caching:** Previously computed polynomials and $\mu$ coefficients are cached to speed up recursive lookups.
 
 ---
@@ -45,15 +45,15 @@ For elements 10 and above, use lowercase letters: `a` = 10, `b` = 11, ..., `n` =
 
 Requires a C++20 compliant compiler (`clang++` or `g++`) and `make`.
 
-| Target | Command | Max $n$ |
-| :--- | :--- | :---: |
-| Standard | `make` | $\le 16$ |
-| Large-N | `make BIG_N=1` | $\le 24$ |
+| Target | Command | Max $n$ | Note |
+| :--- | :--- | :---: | :--- |
+| Standard | `make` | $\le 16$ | |
+| Large-N | `make BIG_N=1` | $\le 24$ | Requires GCC or Clang (MSVC not supported due to `__uint128_t`) |
 
-To use `g++` instead of the default `clang++`:
+To use `clang++` instead of the default `g++`:
 
 ```bash
-make COMPILER=gcc
+make CXX=clang++
 ```
 
 To clean build artifacts:
