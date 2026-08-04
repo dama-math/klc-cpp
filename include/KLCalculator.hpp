@@ -3,8 +3,7 @@
 #include "Config.hpp"
 #include "Permutation.hpp"
 #include "Polynomial.hpp"
-#include "PolynomialPool.hpp"
-#include "FastMap.hpp"
+#include <unordered_map>
 #include <string>
 #include <vector>
 #include <utility> // For std::pair
@@ -63,14 +62,11 @@ private:
     
     using PermPair = std::pair<PackedInt, PackedInt>;
     
-    // Interning Pool for polynomials to save memory allocations
-    PolynomialPool poly_pool;
-
-    // Fast Cache mapping packed permutation pairs to polynomial IDs
-    FastMap<PermPair, uint32_t, CacheKeyHasher> cache; 
+    // Fast Cache mapping packed permutation pairs to polynomials
+    std::unordered_map<PermPair, Polynomial, CacheKeyHasher> cache; 
     
     // Fast Cache for tracking intermediate mu coefficients
-    FastMap<PermPair, long long, CacheKeyHasher> mu_cache;
+    std::unordered_map<PermPair, long long, CacheKeyHasher> mu_cache;
 
     /** @brief Core recursive function for standard KL calculation. */
     Polynomial get_kl_recursive(Permutation x, Permutation w, bool already_bruhat_checked);

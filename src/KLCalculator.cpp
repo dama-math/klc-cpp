@@ -231,7 +231,6 @@ Polynomial KLPolynomialCalculator::calculate_kl(const Permutation& x, const Perm
 void KLPolynomialCalculator::clear_cache() {
     cache.clear();
     mu_cache.clear();
-    poly_pool.clear();
 }
 
 void KLPolynomialCalculator::precompute_kl_polynomials(int max_n) {
@@ -278,8 +277,8 @@ Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w
 
     // Check the cache
     const auto key = std::make_pair(x.pack(), w.pack());
-    if (const auto* cached_id = cache.find(key)) {
-        return poly_pool.get_poly(*cached_id);
+    if (auto it = cache.find(key); it != cache.end()) {
+        return it->second;
     }
 
     int s_index  = -1;
@@ -312,9 +311,8 @@ Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w
     // Subtract summation terms
     apply_correction_term(result, x, ws, s_index);
     
-    // Store the result in the cache and polynomial pool
-    uint32_t result_id = poly_pool.get_id(result);
-    cache[key] = result_id;
+    // Store the result in the cache
+    cache.insert({key, result});
     mu_cache[key] = result.get_coeff((w.length() - x.length() - 1) / 2);
     return result;
 }
@@ -428,8 +426,8 @@ long long KLPolynomialCalculator::get_mu_recursive(Permutation x, Permutation w,
     }
 
     const auto key = std::make_pair(x.pack(), w.pack());
-    if (const auto* cached_mu = mu_cache.find(key)) {
-        return *cached_mu;
+    if (auto it = mu_cache.find(key); it != mu_cache.end()) {
+        return it->second;
     }
 
     int s_index  = -1;

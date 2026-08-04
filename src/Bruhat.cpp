@@ -253,50 +253,6 @@ bool is_bruhat_less_than(const Permutation& x, const Permutation& w) {
     return true;
 }
 
-bool is_extremal_pair(const std::vector<int>& x_data, const std::vector<int>& w_data) {
-    int n = x_data.size();
-    if (n != (int)w_data.size()) return false;
 
-    for (int i = 0; i < n - 1; ++i) {
-        if (x_data[i] < x_data[i+1] && w_data[i] > w_data[i+1]) return false;
-    }
-
-    std::vector<int> x_inv(n), w_inv(n);
-    for (int i = 0; i < n; ++i) {
-        x_inv[x_data[i]] = i;
-        w_inv[w_data[i]] = i;
-    }
-    
-    for (int i = 0; i < n - 1; ++i) {
-        if (x_inv[i] < x_inv[i+1] && w_inv[i] > w_inv[i+1]) return false;
-    }
-    
-    return true;
-}
-
-bool is_bruhat_less_than(const std::vector<int>& x_data, const std::vector<int>& w_data) {
-    if (x_data.size() != w_data.size()) return false;
-    int n = x_data.size();
-    if (n == 0) return true;
-
-    std::vector<int> diff_row(n, 0);
-
-    for (int i = 0; i < n; ++i) {
-        int xi = x_data[i];
-        int wi = w_data[i];
-        
-        if (xi < wi) {
-            for (int j = xi; j < wi; ++j) {
-                diff_row[j]++;
-            }
-        } else if (xi > wi) {
-            for (int j = wi; j < xi; ++j) {
-                if (--diff_row[j] < 0) return false;
-            }
-        }
-    }
-
-    return true;
-}
 
 } // namespace Bruhat

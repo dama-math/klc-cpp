@@ -30,14 +30,7 @@ bool reduce(Permutation& x, Permutation& w);
  */
 bool is_extremal_pair(const Permutation& x, const Permutation& w);
 
-/**
- * @brief Overload for checking extremal pairs using raw vectors.
- * 
- * @param x_data The first permutation vector.
- * @param w_data The second permutation vector.
- * @return True if (x, w) is an extremal pair, false otherwise.
- */
-bool is_extremal_pair(const std::vector<int>& x_data, const std::vector<int>& w_data);
+
 
 /**
  * @brief Checks if permutation x is less than or equal to permutation w in the Bruhat order.
@@ -48,13 +41,6 @@ bool is_extremal_pair(const std::vector<int>& x_data, const std::vector<int>& w_
  */
 bool is_bruhat_less_than(const Permutation& x, const Permutation& w);
 
-/**
- * @brief Overload for checking Bruhat order using raw vectors.
- * 
- * @param x_data The first permutation vector.
- * @param w_data The second permutation vector.
- * @return True if x <= w in the Bruhat order, false otherwise.
- */
-bool is_bruhat_less_than(const std::vector<int>& x_data, const std::vector<int>& w_data);
+
 
 } // namespace Bruhat
