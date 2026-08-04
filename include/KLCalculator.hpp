@@ -37,15 +37,6 @@ public:
      */
     void clear_cache();
 
-    /** 
-     * @brief Precomputes KL polynomials for all permutations up to a given size.
-     * 
-     * Useful for eagerly filling the cache when batch processing.
-     * 
-     * @param max_n The maximum permutation size for precomputation.
-     */
-    void precompute_kl_polynomials(int max_n);
-
 private:
     struct CacheKeyHasher {
         std::size_t operator()(const std::pair<PackedInt, PackedInt>& p) const {
@@ -109,6 +100,4 @@ private:
     void mu_perform_correction(
         long long& current_mu, const Permutation& x, const Permutation& ws, const Permutation& z);
 
-    /** @brief Computes rank matrices for legacy Bruhat order comparison. */
-    static std::vector<std::vector<int>> compute_rx_matrix(const std::vector<int>& p_data);
 };

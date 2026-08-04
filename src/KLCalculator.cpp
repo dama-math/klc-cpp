@@ -233,26 +233,6 @@ void KLPolynomialCalculator::clear_cache() {
     mu_cache.clear();
 }
 
-void KLPolynomialCalculator::precompute_kl_polynomials(int max_n) {
-    for (int n = 1; n <= max_n; ++n) {
-        std::vector<int> p(n);
-        std::iota(p.begin(), p.end(), 0);
-
-        std::vector<Permutation> permutations;
-        do {
-            permutations.emplace_back(p);
-        } while (std::next_permutation(p.begin(), p.end()));
-
-        for (const auto& w : permutations) {
-            for (const auto& x : permutations) {
-                if (Bruhat::is_bruhat_less_than(x, w)) {
-                    calculate_kl(x, w);
-                }
-            }
-        }
-    }
-}
-
 //##############################################################################
 //##
 //## Main Recursive Logic
@@ -530,19 +510,3 @@ void KLPolynomialCalculator::mu_perform_correction(
     current_mu -= mu_z_ws * mu_x_z;
 }
 
-std::vector<std::vector<int>> KLPolynomialCalculator::compute_rx_matrix(const std::vector<int>& p_data) {
-    int n = p_data.size();
-    std::vector<int> buf(n * n);
-    
-    // Utilize the flat optimized routine under the hood
-    Permutation p(p_data);
-    compute_rx_matrix_flat(p, buf.data(), n);
-    
-    std::vector<std::vector<int>> res(n, std::vector<int>(n));
-    for(int i = 0; i < n; ++i) {
-        for(int j = 0; j < n; ++j) {
-            res[i][j] = buf[i * n + j];
-        }
-    }
-    return res;
-}

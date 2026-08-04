@@ -69,8 +69,6 @@ public:
     ValueType* data_ptr_mut() { return data.data(); }
     const ValueType* data_ptr() const { return data.data(); }
 
-    /** @brief Updates the cached size based on internal n (no-op now, n is source of truth). */
-    void update_size() { /* n is maintained directly */ }
 
     /** @brief Resets the cached length value. */
     void reset_length_cache() { length_ = -1; }
@@ -88,16 +86,6 @@ public:
     /** @return A packed representation of the permutation as a PackedInt. */
     PackedInt pack() const;
 
-    /**
-     * @brief Unpacks a permutation from a packed integer.
-     * @param packed Packed representation.
-     * @param n Expected size of the permutation.
-     * @return The unpacked vector (helper for construction).
-     */
-    static std::vector<int> unpack_to_vector(PackedInt packed, int n);
-    
-    /** @brief Factory from packed. */
-    static Permutation from_packed(PackedInt packed, int n);
 
     /** @return The inverse permutation. */
     Permutation inverse() const;

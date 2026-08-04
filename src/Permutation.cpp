@@ -98,23 +98,6 @@ PackedInt Permutation::pack() const {
     return packed;
 }
 
-std::vector<int> Permutation::unpack_to_vector(PackedInt packed, int n) {
-    std::vector<int> d(n);
-    for (int i = 0; i < n; ++i) {
-        d[i] = (packed >> (BITS_PER_ELEMENT * i)) & PACKED_MASK;
-    }
-    return d;
-}
-
-Permutation Permutation::from_packed(PackedInt packed, int n) {
-    Permutation p;
-    p.set_size(n);
-    for (int i = 0; i < n; ++i) {
-        p.data[i] = static_cast<ValueType>((packed >> (BITS_PER_ELEMENT * i)) & PACKED_MASK);
-    }
-    return p;
-}
-
 Permutation Permutation::inverse() const {
     Permutation new_perm;
     new_perm.n = n;

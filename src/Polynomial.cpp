@@ -34,12 +34,6 @@ long long Polynomial::get_coeff(int i) const {
     return data_ptr()[i];
 }
 
-std::vector<long long> Polynomial::get_coeffs() const {
-    if (deg < 0) return {0};
-    const long long* ptr = data_ptr();
-    return std::vector<long long>(ptr, ptr + deg + 1);
-}
-
 // Operators
 bool Polynomial::operator==(const Polynomial& rhs) const {
     if (deg != rhs.deg) return false;
@@ -282,19 +276,6 @@ bool Polynomial::is_zero() const {
     return deg < 0;
 }
 
-std::size_t Polynomial::hash() const {
-    std::size_t seed = 0;
-    int current_deg = degree();
-    seed ^= std::hash<int>{}(current_deg) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    
-    if (current_deg >= 0) {
-        const long long* ptr = data_ptr();
-        for (int i = 0; i <= current_deg; ++i) {
-            seed ^= std::hash<long long>{}(ptr[i]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        }
-    }
-    return seed;
-}
 
 void Polynomial::trim() {
     long long* ptr = data_ptr_mut();

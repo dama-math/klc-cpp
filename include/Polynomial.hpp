@@ -27,8 +27,6 @@ public:
     /** @return Coefficient of the i-th power of q. */
     long long get_coeff(int i) const;
 
-    /** @return Copy of coefficients as a vector (for compatibility). */
-    std::vector<long long> get_coeffs() const;
 
     /** @brief Equality operator. */
     bool operator==(const Polynomial& rhs) const;
@@ -81,12 +79,6 @@ public:
     /** @return True if the polynomial is identically zero. */
     bool is_zero() const;
 
-    /**
-     * @brief Computes a hash value for the polynomial.
-     * @return Hash code.
-     */
-    std::size_t hash() const;
-
 private:
     static constexpr int SMALL_SIZE = 8;
     int deg = -1; // -1 for zero polynomial
@@ -116,11 +108,3 @@ private:
     void resize_storage(int new_size);
 };
 
-/**
- * @brief Hash structure for Polynomial to be used in std::unordered_map.
- */
-struct PolynomialHash {
-    std::size_t operator()(const Polynomial& p) const {
-        return p.hash();
-    }
-};
