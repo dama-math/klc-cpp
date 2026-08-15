@@ -4,29 +4,32 @@
 #include <string>
 #include <numeric>
 #include <array>
-#include <variant>
+#include <cstdint>
 
 /**
  * @brief Represents a polynomial.
  * 
- * Highly efficient polynomial representation using std::variant for Small Buffer Optimization.
- * Small polynomials (degree < 8) are stored directly in the object.
- * Larger polynomials fall back to std::vector.
+ * Highly efficient fixed-size polynomial representation.
+ * Avoids any heap allocation or variant overhead.
  */
 class Polynomial {
 public:
+    static constexpr int MAX_CAPACITY = 32;
+
     /** @brief Default constructor creating a zero polynomial. */
-    Polynomial();
+    Polynomial() : deg(-1) {}
 
     /** @brief Constructs a polynomial from a vector of coefficients. */
     Polynomial(const std::vector<long long>& coeffs);
 
     /** @return The degree of the polynomial. */
-    int degree() const;
+    int degree() const { return deg; }
 
     /** @return Coefficient of the i-th power of q. */
-    long long get_coeff(int i) const;
-
+    long long get_coeff(int i) const {
+        if (i < 0 || i > deg) return 0;
+        return data[i];
+    }
 
     /** @brief Equality operator. */
     bool operator==(const Polynomial& rhs) const;
@@ -63,6 +66,46 @@ public:
      */
     Polynomial multiply_by_scalar(long long scalar) const;
 
+    /** @brief Directly adds rhs * q^shift to *this in-place without creating temporaries. */
+    void add_shifted(const Polynomial& rhs, int shift, long long scalar = 1) {
+        if (rhs.deg < 0 || scalar == 0) return;
+        int needed_deg = rhs.deg + shift;
+        if (deg < needed_deg) {
+            std::fill(data.begin() + deg + 1, data.begin() + needed_deg + 1, 0);
+            deg = needed_deg;
+        }
+        if (scalar == 1) {
+            for (int i = 0; i <= rhs.deg; ++i) {
+                data[i + shift] += rhs.data[i];
+            }
+        } else {
+            for (int i = 0; i <= rhs.deg; ++i) {
+                data[i + shift] += rhs.data[i] * scalar;
+            }
+        }
+        trim();
+    }
+
+    /** @brief Directly subtracts rhs * q^shift to *this in-place without creating temporaries. */
+    void subtract_shifted(const Polynomial& rhs, int shift, long long scalar = 1) {
+        if (rhs.deg < 0 || scalar == 0) return;
+        int needed_deg = rhs.deg + shift;
+        if (deg < needed_deg) {
+            std::fill(data.begin() + deg + 1, data.begin() + needed_deg + 1, 0);
+            deg = needed_deg;
+        }
+        if (scalar == 1) {
+            for (int i = 0; i <= rhs.deg; ++i) {
+                data[i + shift] -= rhs.data[i];
+            }
+        } else {
+            for (int i = 0; i <= rhs.deg; ++i) {
+                data[i + shift] -= rhs.data[i] * scalar;
+            }
+        }
+        trim();
+    }
+
     /**
      * @brief Evaluates the polynomial at a given value of q.
      * @param q The value to substitute for q.
@@ -77,34 +120,20 @@ public:
     std::string to_string_simple() const;
 
     /** @return True if the polynomial is identically zero. */
-    bool is_zero() const;
+    bool is_zero() const { return deg < 0; }
+
+    const long long* data_ptr() const { return data.data(); }
+    long long* data_ptr_mut() { return data.data(); }
 
 private:
-    static constexpr int SMALL_SIZE = 8;
     int deg = -1; // -1 for zero polynomial
-    
-    using SmallStorage = std::array<long long, SMALL_SIZE>;
-    using LargeStorage = std::vector<long long>;
-    std::variant<SmallStorage, LargeStorage> storage;
+    std::array<long long, MAX_CAPACITY> data{};
 
-    void trim();
-    void switch_to_large(); // Helper to promote to large storage
-    
-    // Helpers for internal access
-    long long const* data_ptr() const {
-        if (const auto* p = std::get_if<SmallStorage>(&storage)) return p->data();
-        return std::get_if<LargeStorage>(&storage)->data();
+    void trim() {
+        while (deg >= 0 && data[deg] == 0) {
+            deg--;
+        }
     }
-    
-    long long* data_ptr_mut() {
-        if (auto* p = std::get_if<SmallStorage>(&storage)) return p->data();
-        return std::get_if<LargeStorage>(&storage)->data();
-    }
-    
-    int data_size() const {
-        return deg + 1;
-    }
-    
-    void resize_storage(int new_size);
 };
+
 

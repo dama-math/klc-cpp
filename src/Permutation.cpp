@@ -2,23 +2,7 @@
 #include <numeric>
 #include <algorithm>
 #include <stdexcept>
-
 #include <bit>
-
-Permutation::Permutation(const ValueType* data_ptr, int n_val) {
-    if (n_val > MAX_SIZE) throw std::length_error("Permutation size exceeds maximum allowed size");
-    n = n_val;
-    // Copy directly without casting since the underlying type matches
-    std::copy(data_ptr, data_ptr + n, data.begin());
-}
-
-Permutation::Permutation(const int* data_ptr, int n_val) {
-    if (n_val > MAX_SIZE) throw std::length_error("Permutation size exceeds maximum allowed size");
-    n = n_val;
-    for(int i = 0; i < n; ++i) {
-        data[i] = static_cast<ValueType>(data_ptr[i]);
-    }
-}
 
 Permutation::Permutation(const std::string& one_line_notation) {
     std::vector<int> vec = from_one_line_notation(one_line_notation);
@@ -47,104 +31,6 @@ std::vector<int> Permutation::to_vector() const {
         res[i] = static_cast<int>(data[i]);
     }
     return res;
-}
-
-int Permutation::length() const {
-    // Return cached length if it has already been computed
-    if (length_ != -1) {
-        return length_;
-    }
-
-    int inversions = 0;
-    if (n <= 32) {
-        // O(n) bitmask algorithm for N <= 32
-        uint32_t seen = 0;
-        for (int i = 0; i < n; ++i) {
-            int v = data[i];
-            if (v < 31) {
-                inversions += std::popcount(seen >> (v + 1));
-            }
-            seen |= (1u << v);
-        }
-    } else {
-        // Fallback to standard scalar calculation if N > 32
-        for (int i = 0; i < n; ++i) {
-            for (int j = i + 1; j < n; ++j) {
-                if (data[i] > data[j]) {
-                    inversions++;
-                }
-            }
-        }
-    }
-    
-    length_ = inversions;
-    return length_;
-}
-
-PackedInt Permutation::pack() const {
-#ifdef USE_128BIT_PACKING
-    if (n <= 12) {
-        uint64_t low = 0;
-        for (int i = 0; i < n; ++i) {
-            low |= ((uint64_t)(data[i] & PACKED_MASK) << (BITS_PER_ELEMENT * i));
-        }
-        return low;
-    }
-#endif
-    PackedInt packed = 0;
-    for (int i = 0; i < n; ++i) {
-        packed |= ((PackedInt)(data[i] & PACKED_MASK) << (BITS_PER_ELEMENT * i));
-    }
-    return packed;
-}
-
-Permutation Permutation::inverse() const {
-    Permutation new_perm;
-    new_perm.n = n;
-    
-    for (int i = 0; i < n; ++i) {
-        new_perm.data[static_cast<int>(data[i])] = static_cast<ValueType>(i);
-    }
-    
-    // The length of a permutation is always equal to the length of its inverse
-    if (this->length_ != -1) {
-        new_perm.length_ = this->length_;
-    }
-    return new_perm;
-}
-
-Permutation Permutation::multiply_simple_transposition(int i) const {
-    if (i < 0 || i >= n - 1) {
-        throw std::out_of_range("Index for simple transposition is out of range.");
-    }
-    // Perform an efficient copy of the fixed-size array
-    Permutation new_perm = *this;
-    
-    std::swap(new_perm.data[i], new_perm.data[i + 1]);
-    
-    // By default, invalidate the length cache for the new permutation
-    new_perm.length_ = -1;
-
-    // If the length of the current permutation is known, we can calculate
-    // the new length in O(1) time based on whether we swapped an ascent or descent.
-    if (this->length_ != -1) {
-        if (data[i] < data[i+1]) {
-            new_perm.length_ = this->length_ + 1;
-        } else {
-            new_perm.length_ = this->length_ - 1;
-        }
-    }
-    return new_perm;
-}
-
-bool Permutation::operator==(const Permutation& rhs) const {
-    if (n != rhs.n) return false;
-    
-    // Compare elements sequentially to avoid issues with uninitialized padding
-    for(int i = 0; i < n; ++i) {
-        if (data[i] != rhs.data[i]) return false;
-    }
-    return true;
 }
 
 std::string Permutation::to_string() const {

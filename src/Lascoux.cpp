@@ -272,9 +272,7 @@ bool has_3412_pattern(const Permutation& p) {
     int n = p.size();
     if (n < 4) return false;
 
-    // Precompute the maximum value to the left that is less than the current value
-    // left_max_lt[j] = max_{i<j, w[i] < w[j]} w[i], or -1 if none
-    std::vector<int> left_max_lt(n, -1);
+    int left_max_lt[32];
     for (int j = 0; j < n; ++j) {
         int mx = -1;
         int wj = p[j];
@@ -285,7 +283,8 @@ bool has_3412_pattern(const Permutation& p) {
         left_max_lt[j] = mx;
     }
 
-    std::vector<int> freq(n + 1, 0), pref(n + 1, 0);
+    int freq[33] = {0};
+    int pref[33] = {0};
 
     for (int k = n - 2; k >= 1; --k) {
         ++freq[p[k + 1]];

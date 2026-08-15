@@ -1,118 +1,49 @@
 #include "Polynomial.hpp"
 #include <algorithm>
 #include <iostream>
-#include <cstring>  // for memcpy
+#include <cstring>
 #include <cassert>
 
-// Constructors
-Polynomial::Polynomial() : deg(-1), storage(std::in_place_type<SmallStorage>) {
-    std::get<SmallStorage>(storage).fill(0);
-}
-
 Polynomial::Polynomial(const std::vector<long long>& coeffs) {
-    int n = coeffs.size();
-    if (n <= SMALL_SIZE) {
-        storage.emplace<SmallStorage>();
-        auto& arr = std::get<SmallStorage>(storage);
-        arr.fill(0);
-        std::copy(coeffs.begin(), coeffs.end(), arr.begin());
-        deg = n - 1;
-    } else {
-        storage.emplace<LargeStorage>(coeffs);
-        deg = n - 1;
+    deg = (int)coeffs.size() - 1;
+    if (deg >= MAX_CAPACITY) {
+        throw std::length_error("Polynomial degree exceeds MAX_CAPACITY");
+    }
+    data.fill(0);
+    for (size_t i = 0; i < coeffs.size(); ++i) {
+        data[i] = coeffs[i];
     }
     trim();
 }
 
-// Accessors
-int Polynomial::degree() const {
-    return deg;
-}
-
-long long Polynomial::get_coeff(int i) const {
-    if (i < 0 || i > deg) return 0;
-    return data_ptr()[i];
-}
-
-// Operators
 bool Polynomial::operator==(const Polynomial& rhs) const {
     if (deg != rhs.deg) return false;
     if (deg < 0) return true;
-    
-    const long long* p1 = data_ptr();
-    const long long* p2 = rhs.data_ptr();
-    
-    return std::equal(p1, p1 + deg + 1, p2);
-}
-
-void Polynomial::resize_storage(int new_size) {
-    if (new_size <= SMALL_SIZE) {
-        if (std::holds_alternative<LargeStorage>(storage)) {
-            SmallStorage arr;
-            arr.fill(0);
-            auto& vec = std::get<LargeStorage>(storage);
-            std::copy(vec.begin(), vec.begin() + new_size, arr.begin());
-            storage.emplace<SmallStorage>(arr);
-        } else {
-            auto& arr = std::get<SmallStorage>(storage);
-            if (deg < new_size - 1) {
-                 std::fill(arr.begin() + deg + 1, arr.begin() + new_size, 0);
-            }
-        }
-    } else {
-        if (std::holds_alternative<SmallStorage>(storage)) {
-            switch_to_large();
-        }
-        std::get<LargeStorage>(storage).resize(new_size, 0);
-    }
-}
-
-void Polynomial::switch_to_large() {
-    if (std::holds_alternative<LargeStorage>(storage)) return;
-    auto& arr = std::get<SmallStorage>(storage);
-    LargeStorage vec(std::max((int)deg + 1, (int)SMALL_SIZE), 0);
-    std::copy(arr.begin(), arr.begin() + deg + 1, vec.begin());
-    storage.emplace<LargeStorage>(std::move(vec));
+    return std::equal(data.begin(), data.begin() + deg + 1, rhs.data.begin());
 }
 
 Polynomial& Polynomial::operator+=(const Polynomial& rhs) {
     if (rhs.deg < 0) return *this;
-    
-    int new_deg = std::max(deg, rhs.deg);
-    int current_capacity = std::holds_alternative<SmallStorage>(storage) ? SMALL_SIZE : std::get<LargeStorage>(storage).size();
-    if (new_deg + 1 > current_capacity) {
-        resize_storage(new_deg + 1);
+    if (deg < rhs.deg) {
+        std::fill(data.begin() + deg + 1, data.begin() + rhs.deg + 1, 0);
+        deg = rhs.deg;
     }
-    
-    long long* p1 = data_ptr_mut();
-    const long long* p2 = rhs.data_ptr();
-    
     for (int i = 0; i <= rhs.deg; ++i) {
-        p1[i] += p2[i];
+        data[i] += rhs.data[i];
     }
-    
-    deg = new_deg;
     trim();
     return *this;
 }
 
 Polynomial& Polynomial::operator-=(const Polynomial& rhs) {
     if (rhs.deg < 0) return *this;
-
-    int new_deg = std::max(deg, rhs.deg);
-    int current_capacity = std::holds_alternative<SmallStorage>(storage) ? SMALL_SIZE : std::get<LargeStorage>(storage).size();
-    if (new_deg + 1 > current_capacity) {
-        resize_storage(new_deg + 1);
+    if (deg < rhs.deg) {
+        std::fill(data.begin() + deg + 1, data.begin() + rhs.deg + 1, 0);
+        deg = rhs.deg;
     }
-
-    long long* p1 = data_ptr_mut();
-    const long long* p2 = rhs.data_ptr();
-
     for (int i = 0; i <= rhs.deg; ++i) {
-        p1[i] -= p2[i];
+        data[i] -= rhs.data[i];
     }
-
-    deg = new_deg;
     trim();
     return *this;
 }
@@ -130,53 +61,24 @@ Polynomial Polynomial::operator-(const Polynomial& rhs) const {
 }
 
 Polynomial& Polynomial::operator*=(const Polynomial& rhs) {
-    if (this->is_zero() || rhs.is_zero()) {
+    if (deg < 0 || rhs.deg < 0) {
         deg = -1;
         return *this;
     }
-
-    // Guard against self-multiplication (p *= p) which would invalidate
-    // the rhs data pointer when storage is modified in-place.
-    if (this == &rhs) {
-        Polynomial copy(rhs);
-        return *this *= copy;
-    }
-    
     int new_deg = deg + rhs.deg;
-    int needed_size = new_deg + 1;
-    
-    if (needed_size <= SMALL_SIZE) {
-        SmallStorage buf;
-        buf.fill(0);
-        
-        const long long* A = data_ptr();
-        const long long* B = rhs.data_ptr();
-        
-        for (int i = 0; i <= deg; ++i) {
-            if (A[i] == 0) continue;
-            for (int j = 0; j <= rhs.deg; ++j) {
-                buf[i + j] += A[i] * B[j];
-            }
-        }
-        
-        storage.emplace<SmallStorage>(buf);
-        deg = new_deg;
-    } else {
-        LargeStorage res(needed_size, 0);
-        const long long* A = data_ptr();
-        const long long* B = rhs.data_ptr();
-        
-        for (int i = 0; i <= deg; ++i) {
-            if (A[i] == 0) continue;
-            for (int j = 0; j <= rhs.deg; ++j) {
-                res[i + j] += A[i] * B[j];
-            }
-        }
-        
-        storage.emplace<LargeStorage>(std::move(res));
-        deg = new_deg;
+    if (new_deg >= MAX_CAPACITY) {
+        throw std::length_error("Product degree exceeds MAX_CAPACITY");
     }
-    
+    std::array<long long, MAX_CAPACITY> buf{};
+    for (int i = 0; i <= deg; ++i) {
+        long long c = data[i];
+        if (c == 0) continue;
+        for (int j = 0; j <= rhs.deg; ++j) {
+            buf[i + j] += c * rhs.data[j];
+        }
+    }
+    data = buf;
+    deg = new_deg;
     trim();
     return *this;
 }
@@ -189,31 +91,25 @@ Polynomial Polynomial::operator*(const Polynomial& rhs) const {
 
 Polynomial Polynomial::shift(int amount) const {
     assert(amount >= 0 && "shift amount must be non-negative");
-    if (amount == 0) return *this;
-    if (is_zero()) return *this;
+    if (amount == 0 || deg < 0) return *this;
 
     Polynomial res;
-    int new_deg = deg + amount;
-    int needed_size = new_deg + 1;
-    
-    res.resize_storage(needed_size);
-    long long* dst = res.data_ptr_mut();
-    const long long* src = data_ptr();
-    
-    std::copy(src, src + deg + 1, dst + amount);
-    
-    res.deg = new_deg;
+    res.deg = deg + amount;
+    if (res.deg >= MAX_CAPACITY) {
+        throw std::length_error("Shifted degree exceeds MAX_CAPACITY");
+    }
+    std::fill(res.data.begin(), res.data.begin() + amount, 0);
+    std::memcpy(res.data.data() + amount, data.data(), (deg + 1) * sizeof(long long));
     return res;
 }
 
 Polynomial Polynomial::multiply_by_scalar(long long scalar) const {
-    if (scalar == 0) return Polynomial(); 
+    if (scalar == 0 || deg < 0) return Polynomial(); 
     if (scalar == 1) return *this;
     
     Polynomial res(*this);
-    long long* ptr = res.data_ptr_mut();
-    for(int i = 0; i <= deg; ++i) {
-        ptr[i] *= scalar;
+    for (int i = 0; i <= deg; ++i) {
+        res.data[i] *= scalar;
     }
     return res;
 }
@@ -222,9 +118,8 @@ long long Polynomial::substitute(long long q) const {
     if (deg < 0) return 0;
     long long result = 0;
     long long q_power = 1;
-    const long long* ptr = data_ptr();
     for (int i = 0; i <= deg; ++i) {
-        result += ptr[i] * q_power;
+        result += data[i] * q_power;
         q_power *= q;
     }
     return result;
@@ -234,17 +129,15 @@ std::string Polynomial::to_string() const {
     if (is_zero()) return "0";
 
     std::string s = "";
-    const long long* coeffs = data_ptr();
-    
     for (int i = deg; i >= 0; --i) {
-        if (coeffs[i] != 0) {
+        if (data[i] != 0) {
             if (i < deg) {
-                s += (coeffs[i] > 0) ? " + " : " - ";
-            } else if (coeffs[i] < 0) {
+                s += (data[i] > 0) ? " + " : " - ";
+            } else if (data[i] < 0) {
                  s += "-";
             }
             
-            long long abs_coeff = std::abs(coeffs[i]);
+            long long abs_coeff = std::abs(data[i]);
             if (abs_coeff != 1 || i == 0) {
                 s += std::to_string(abs_coeff);
             }
@@ -264,22 +157,10 @@ std::string Polynomial::to_string_simple() const {
     if (is_zero()) return "0";
     
     std::string s = "";
-    const long long* coeffs = data_ptr();
     for (int i = 0; i <= deg; ++i) {
         if (i > 0) s += ",";
-        s += std::to_string(coeffs[i]);
+        s += std::to_string(data[i]);
     }
     return s;
 }
 
-bool Polynomial::is_zero() const {
-    return deg < 0;
-}
-
-
-void Polynomial::trim() {
-    long long* ptr = data_ptr_mut();
-    while (deg >= 0 && ptr[deg] == 0) {
-        deg--;
-    }
-}

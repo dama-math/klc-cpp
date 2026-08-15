@@ -25,22 +25,35 @@ constexpr ValueType REMOVED = -1;
  */
 int make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
     if (n <= 1) return 0;
-    bool changed = true;
-    int swaps_made = 0;
     
     ValueType x_inv[32];
     ValueType w_inv[32];
     
     for (int i = 0; i < n; ++i) {
-        x_inv[x_data[i]] = i;
-        w_inv[w_data[i]] = i;
+        x_inv[static_cast<int>(x_data[i])] = static_cast<ValueType>(i);
+        w_inv[static_cast<int>(w_data[i])] = static_cast<ValueType>(i);
     }
+
+    uint32_t w_desc = 0;
+    uint32_t w_inv_desc = 0;
+    for (int i = 0; i < n - 1; ++i) {
+        if (w_data[i] > w_data[i + 1]) w_desc |= (1u << i);
+        if (w_inv[i] > w_inv[i + 1]) w_inv_desc |= (1u << i);
+    }
+
+    if (w_desc == 0 && w_inv_desc == 0) return 0;
+    
+    bool changed = true;
+    int swaps_made = 0;
     
     while (changed) {
         changed = false;
         
-        for (int i = 0; i < n - 1; ++i) {
-            if (w_data[i] > w_data[i + 1] && x_data[i] < x_data[i + 1]) {
+        uint32_t mask = w_desc;
+        while (mask) {
+            int i = std::countr_zero(mask);
+            mask &= mask - 1;
+            if (x_data[i] < x_data[i + 1]) {
                 int val1 = x_data[i];
                 int val2 = x_data[i + 1];
                 std::swap(x_data[i], x_data[i + 1]);
@@ -50,8 +63,11 @@ int make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
             }
         }
         
-        for (int i = 0; i < n - 1; ++i) {
-            if (w_inv[i] > w_inv[i + 1] && x_inv[i] < x_inv[i + 1]) {
+        uint32_t inv_mask = w_inv_desc;
+        while (inv_mask) {
+            int i = std::countr_zero(inv_mask);
+            inv_mask &= inv_mask - 1;
+            if (x_inv[i] < x_inv[i + 1]) {
                 std::swap(x_data[x_inv[i]], x_data[x_inv[i + 1]]);
                 std::swap(x_inv[i], x_inv[i + 1]);
                 changed = true;
@@ -122,11 +138,20 @@ void flatten_inplace(ValueType* x_data, ValueType* w_data, int& n) {
         }
     }
     
+    ValueType rank_table[32];
+    int r = 0;
+    uint32_t m = active_vals;
+    while (m) {
+        int val = std::countr_zero(m);
+        rank_table[val] = static_cast<ValueType>(r++);
+        m &= m - 1;
+    }
+
     int write_idx = 0;
     for (int i = 0; i < n; ++i) {
         if (x_data[i] != REMOVED) {
-            x_data[write_idx] = static_cast<ValueType>(__builtin_popcount(active_vals & ((1u << x_data[i]) - 1)));
-            w_data[write_idx] = static_cast<ValueType>(__builtin_popcount(active_vals & ((1u << w_data[i]) - 1)));
+            x_data[write_idx] = rank_table[static_cast<int>(x_data[i])];
+            w_data[write_idx] = rank_table[static_cast<int>(w_data[i])];
             ++write_idx;
         }
     }
@@ -141,118 +166,47 @@ bool reduce(Permutation& x, Permutation& w) {
     auto* x_data = x.data_ptr_mut();
     auto* w_data = w.data_ptr_mut();
     int n = x.size();
+    if (n <= 1) return true;
 
-    bool changed = true;
-    bool modified = false;
     bool originally_ep = true;
     bool first_iteration = true;
-    
-    int total_x_swaps = 0;
-    bool tilde_applied = false;
-    
-    int initial_x_len = x.has_cached_length() ? x.length() : -1;
-    
-    while (changed) {
+    int total_swaps = 0;
+    bool any_removals = false;
+    int orig_x_len = x.has_cached_length() ? x.length() : -1;
+
+    while (true) {
         int swaps = make_ep_inplace(x_data, w_data, n);
         if (first_iteration && swaps > 0) {
             originally_ep = false;
         }
         first_iteration = false;
-        
-        if (swaps > 0) {
-            modified = true;
-            total_x_swaps += swaps;
-        }
-        
-        int removed_count = tilde_inplace(x_data, w_data, n);
-        if (removed_count > 0) {
+        total_swaps += swaps;
+
+        int removed = tilde_inplace(x_data, w_data, n);
+        if (removed > 0) {
+            any_removals = true;
             flatten_inplace(x_data, w_data, n);
-            // Updating size in wrapper Permutation objects
             x.set_size(n);
             w.set_size(n);
-            changed = true;
-            modified = true;
-            tilde_applied = true;
-        } else {
-            changed = false;
+        }
+
+        if (swaps == 0 && removed == 0) {
+            break;
         }
     }
-    
-    // Conservatively invalidate length caches for both permutations
-    // since make_ep_inplace can modify x data and tilde/flatten can modify both.
-    if (modified) {
-        if (tilde_applied) {
+
+    if (any_removals) {
+        x.reset_length_cache();
+        w.reset_length_cache();
+    } else if (total_swaps > 0) {
+        if (orig_x_len != -1) {
+            x.set_cached_length(orig_x_len + total_swaps);
+        } else {
             x.reset_length_cache();
-            w.reset_length_cache();
-        } else {
-            if (initial_x_len != -1) {
-                x.set_cached_length(initial_x_len + total_x_swaps);
-            } else {
-                x.reset_length_cache();
-            }
         }
     }
+
     return originally_ep;
 }
-
-bool is_extremal_pair(const Permutation& x, const Permutation& w) {
-    int n = x.size();
-    if (n != w.size()) return false;
-
-    // Check direct condition using operator[]
-    for (int i = 0; i < n - 1; ++i) {
-        if (x[i] < x[i+1] && w[i] > w[i+1]) {
-            return false;
-        }
-    }
-
-    // Prepare arrays for the inverse check
-    int x_inv[32];
-    int w_inv[32];
-    
-    for (int i = 0; i < n; ++i) {
-        x_inv[x[i]] = i;
-        w_inv[w[i]] = i;
-    }
-
-    // Check inverse condition
-    for (int i = 0; i < n - 1; ++i) {
-        if (x_inv[i] < x_inv[i+1] && w_inv[i] > w_inv[i+1]) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool is_bruhat_less_than(const Permutation& x, const Permutation& w) {
-    if (x.size() != w.size()) return false;
-    int n = x.size();
-    if (n == 0) return true;
-    
-    int8_t diff_row[32] = {0};
-
-    const auto* x_ptr = x.begin();
-    const auto* w_ptr = w.begin();
-
-    for (int i = 0; i < n; ++i) {
-        int xi = x_ptr[i];
-        int wi = w_ptr[i];
-        
-        if (xi < wi) {
-            for (int j = xi; j < wi; ++j) {
-                diff_row[j]++;
-            }
-        } else if (xi > wi) {
-            for (int j = wi; j < xi; ++j) {
-                if (--diff_row[j] < 0) return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-
 
 } // namespace Bruhat

@@ -38,26 +38,33 @@ public:
     void clear_cache();
 
 private:
-    struct CacheKeyHasher {
+    struct FastPermPairHasher {
+        static inline uint64_t splitmix64(uint64_t x) {
+            x += 0x9e3779b97f4a7c15ULL;
+            x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+            x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+            return x ^ (x >> 31);
+        }
+
         std::size_t operator()(const std::pair<PackedInt, PackedInt>& p) const {
 #ifdef USE_128BIT_PACKING
-             uint64_t h1 = static_cast<uint64_t>(p.first ^ (p.first >> 64));
-             uint64_t h2 = static_cast<uint64_t>(p.second ^ (p.second >> 64));
+            uint64_t h1 = static_cast<uint64_t>(p.first ^ (p.first >> 64));
+            uint64_t h2 = static_cast<uint64_t>(p.second ^ (p.second >> 64));
 #else
-             uint64_t h1 = p.first;
-             uint64_t h2 = p.second;
+            uint64_t h1 = p.first;
+            uint64_t h2 = p.second;
 #endif
-             return std::hash<uint64_t>{}(h1) ^ (std::hash<uint64_t>{}(h2) << 1);
+            return splitmix64(h1 ^ splitmix64(h2));
         }
     };
-    
+
     using PermPair = std::pair<PackedInt, PackedInt>;
-    
+
     // Fast Cache mapping packed permutation pairs to polynomials
-    std::unordered_map<PermPair, Polynomial, CacheKeyHasher> cache; 
+    std::unordered_map<PermPair, Polynomial, FastPermPairHasher> cache; 
     
     // Fast Cache for tracking intermediate mu coefficients
-    std::unordered_map<PermPair, long long, CacheKeyHasher> mu_cache;
+    std::unordered_map<PermPair, long long, FastPermPairHasher> mu_cache;
 
     /** @brief Core recursive function for standard KL calculation. */
     Polynomial get_kl_recursive(Permutation x, Permutation w, bool already_bruhat_checked);
