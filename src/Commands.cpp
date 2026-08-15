@@ -29,12 +29,12 @@ void process_file(const std::string& filename, KLPolynomialCalculator& calculato
 
     std::string line;
     while (std::getline(file, line)) {
-        // Find the space separating the two permutations
-        size_t space_pos = line.find(' ');
-        if (space_pos == std::string::npos) continue;
+        size_t first_non_space = line.find_first_not_of(" \t\r\n");
+        if (first_non_space == std::string::npos || line[first_non_space] == '#') continue;
 
-        std::string x_str = line.substr(0, space_pos);
-        std::string w_str = line.substr(space_pos + 1);
+        std::stringstream ss(line);
+        std::string x_str, w_str;
+        if (!(ss >> x_str >> w_str)) continue;
 
         try {
             Permutation x(x_str);
@@ -130,14 +130,12 @@ void verify_from_file(const std::string& filename, KLPolynomialCalculator& calcu
     std::string line;
     int passed = 0, total = 0;
     while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        size_t sp1 = line.find(' ');
-        size_t sp2 = line.find(' ', sp1 + 1);
-        if (sp1 == std::string::npos || sp2 == std::string::npos) continue;
+        size_t first_non_space = line.find_first_not_of(" \t\r\n");
+        if (first_non_space == std::string::npos || line[first_non_space] == '#') continue;
 
-        std::string x_str = line.substr(0, sp1);
-        std::string w_str = line.substr(sp1 + 1, sp2 - sp1 - 1);
-        std::string expected_poly = line.substr(sp2 + 1);
+        std::stringstream ss(line);
+        std::string x_str, w_str, expected_poly;
+        if (!(ss >> x_str >> w_str >> expected_poly)) continue;
 
         try {
             Permutation x(x_str);
