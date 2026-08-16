@@ -179,21 +179,8 @@ std::vector<Node> build_tree_from_perms(const Permutation& x_perm, const Permuta
  * @return The computed Kazhdan-Lusztig polynomial.
  */
 Polynomial count_edge_labeling(const std::vector<Node>& nodes) {
-    int n = nodes.size();
+    int n = static_cast<int>(nodes.size());
     if (n <= 1) return Polynomial({1});
-
-    std::vector<int> parent(n, -1);
-    int root = -1;
-    for (int u = 0; u < n; ++u) {
-        for (int v : nodes[u].children) parent[v] = u;
-    }
-    for (int i = 0; i < n; ++i) {
-        if (parent[i] == -1) {
-            root = i;
-            break;
-        }
-    }
-    if (root == -1) root = 0;
 
     int max_leaf_capacity = 0;
     bool found_leaf = false;
@@ -208,33 +195,38 @@ Polynomial count_edge_labeling(const std::vector<Node>& nodes) {
     int C = max_leaf_capacity;
     std::vector<std::vector<Polynomial>> dp(n, std::vector<Polynomial>(C + 2));
 
-    // DFS to compute the polynomials bottom-up
-    std::function<void(int)> dfs = 
-        [&](int u) {
-        for (int v : nodes[u].children) dfs(v);
+    auto dfs = [&](auto self, int u) -> void {
+        for (int v : nodes[u].children) self(self, v);
 
         if (nodes[u].children.empty()) {
-            for (int minVal = 0; minVal <= C + 1; ++minVal) {
-                if (minVal <= nodes[u].capacity) {
-                    dp[u][minVal] = Polynomial({1});
-                } else {
-                    dp[u][minVal] = Polynomial(); 
-                }
+            int cap = std::min(C + 1, nodes[u].capacity);
+            for (int minVal = 0; minVal <= cap; ++minVal) {
+                dp[u][minVal] = Polynomial({1});
             }
             return;
+        }
+
+        int num_children = static_cast<int>(nodes[u].children.size());
+        std::vector<std::vector<Polynomial>> suffix_sums(num_children, std::vector<Polynomial>(C + 2));
+
+        for (int c_idx = 0; c_idx < num_children; ++c_idx) {
+            int child = nodes[u].children[c_idx];
+            Polynomial running_sum;
+            for (int t = C; t >= 0; --t) {
+                const Polynomial& childDP = dp[child][t];
+                if (!childDP.is_zero()) {
+                    running_sum.add_shifted(childDP, t);
+                }
+                suffix_sums[c_idx][t] = running_sum;
+            }
         }
 
         for (int minVal = 0; minVal <= C + 1; ++minVal) {
             Polynomial waysHere({1});
             bool impossible = false;
 
-            for (int child : nodes[u].children) {
-                Polynomial childSum;
-                for (int t = minVal; t <= C; ++t) {
-                    const Polynomial& childDP = dp[child][t];
-                    if (childDP.is_zero()) continue;
-                    childSum += childDP.shift(t);
-                }
+            for (int c_idx = 0; c_idx < num_children; ++c_idx) {
+                const Polynomial& childSum = suffix_sums[c_idx][minVal];
                 if (childSum.is_zero()) {
                     impossible = true;
                     break;
@@ -242,17 +234,15 @@ Polynomial count_edge_labeling(const std::vector<Node>& nodes) {
                 waysHere *= childSum;
             }
 
-            if (impossible) {
-                dp[u][minVal] = Polynomial();
-            } else {
+            if (!impossible) {
                 dp[u][minVal] = waysHere;
             }
         }
     };
 
-    dfs(root);
+    dfs(dfs, 0);
 
-    return dp[root][0];
+    return dp[0][0];
 }
 
 } // anonymous namespace

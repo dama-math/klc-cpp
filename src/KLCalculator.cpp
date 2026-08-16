@@ -110,6 +110,9 @@ inline void search_extremal_pairs(const Permutation& x, const Permutation& ws, i
         }
     }
 
+    // Augmented descent mask: z must have descents where ws has descents, and also at s_index
+    const unsigned int augmented_rds_mask = ws_rds_mask | (s_index >= 0 ? (1u << s_index) : 0);
+
     int8_t z_path[MAX_N_OPT];
 
     auto dfs = [&](auto self, int depth, unsigned int used_mask, int current_length, __m128i col) -> void {
@@ -124,11 +127,10 @@ inline void search_extremal_pairs(const Permutation& x, const Permutation& ws, i
         const __m128i x_rx_k = _mm_load_si128(reinterpret_cast<const __m128i*>(x_rx_buf + depth * MAX_N_OPT));
 
         int max_allowed_i = n - 1;
-        if (depth > 0 && (ws_rds_mask & (1u << (depth - 1)))) {
-            max_allowed_i = std::min(max_allowed_i, static_cast<int>(z_path[depth - 1]));
-        }
-        if (s_index != -1 && depth == s_index + 1) {
-            max_allowed_i = std::min(max_allowed_i, static_cast<int>(z_path[s_index]));
+        if (depth > 0 && (augmented_rds_mask & (1u << (depth - 1)))) {
+            int prev = static_cast<int>(z_path[depth - 1]);
+            if (prev == 0) return; // 0 cannot descend to anything smaller
+            max_allowed_i = prev - 1;
         }
 
         unsigned int max_mask = (1u << (max_allowed_i + 1)) - 1;
@@ -303,13 +305,17 @@ void KLPolynomialCalculator::find_covering_relations_and_correct(
     
     int n = x.size();
     
-    // Only swaps involving s_index or s_index + 1 can create a descent at s_index
     for (int j = 0; j < n - 1; ++j) {
         for (int k = j + 1; k < n; ++k) {
             if (j != s_index && j != s_index + 1 && k != s_index && k != s_index + 1) {
                 continue;
             }
             if (ws[j] > ws[k]) {
+                // Early check: after swapping j and k, will z have a descent at s_index?
+                int val_s = (j == s_index) ? ws[k] : ((k == s_index) ? ws[j] : ws[s_index]);
+                int val_s1 = (j == s_index + 1) ? ws[k] : ((k == s_index + 1) ? ws[j] : ws[s_index + 1]);
+                if (val_s <= val_s1) continue;
+
                 bool covering = true;
                 for (int l = j + 1; l < k; ++l) {
                     if (ws[l] > ws[k] && ws[l] < ws[j]) {
@@ -324,11 +330,11 @@ void KLPolynomialCalculator::find_covering_relations_and_correct(
                     std::swap(z.data_ptr_mut()[j], z.data_ptr_mut()[k]);
                     z.set_cached_length(ws.length() - 1); 
                     
-                    if (z[s_index] > z[s_index + 1] &&
-                        Bruhat::is_bruhat_less_than(x, z) &&
+                    if (Bruhat::is_bruhat_less_than(x, z) &&
                         !Bruhat::is_extremal_pair(z, ws)) {
                         
-                        perform_correction(poly, x, ws, z);
+                        Polynomial p_x_z = get_kl_recursive(x, z, true);
+                        poly.subtract_shifted(p_x_z, 1, 1);
                     }
                 }
             }
@@ -479,6 +485,11 @@ void KLPolynomialCalculator::mu_find_covering_relations_and_correct(
                 continue;
             }
             if (ws[j] > ws[k]) {
+                // Early check: after swapping j and k, will z have a descent at s_index?
+                int val_s = (j == s_index) ? ws[k] : ((k == s_index) ? ws[j] : ws[s_index]);
+                int val_s1 = (j == s_index + 1) ? ws[k] : ((k == s_index + 1) ? ws[j] : ws[s_index + 1]);
+                if (val_s <= val_s1) continue;
+
                 bool covering = true;
                 for (int l = j + 1; l < k; ++l) {
                     if (ws[l] > ws[k] && ws[l] < ws[j]) {
@@ -492,9 +503,13 @@ void KLPolynomialCalculator::mu_find_covering_relations_and_correct(
                     std::swap(z.data_ptr_mut()[j], z.data_ptr_mut()[k]);
                     z.set_cached_length(ws.length() - 1);
                     
-                    if (z[s_index] > z[s_index + 1] && Bruhat::is_bruhat_less_than(x, z)) {
-                        mu_perform_correction(current_mu, x, ws, z);
-                        if (current_mu == 0) return;
+                    if (Bruhat::is_bruhat_less_than(x, z)) {
+                        int len_diff_x_z = z.length() - x.length();
+                        if (len_diff_x_z > 0 && (len_diff_x_z % 2 != 0)) {
+                            long long mu_x_z = (len_diff_x_z == 1) ? 1 : get_mu_recursive(x, z, true);
+                            current_mu -= mu_x_z;
+                            if (current_mu == 0) return;
+                        }
                     }
                 }
             }
