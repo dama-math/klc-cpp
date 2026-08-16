@@ -16,6 +16,14 @@ void process_file(const std::string& filename, KLPolynomialCalculator& calculato
 void speedtest();
 
 /**
+ * @brief Run a speed test calculating P_{e, w}(q) for random permutations.
+ * @param n Size of the symmetric group (default: 12).
+ * @param num_calculations Number of random calculations to perform (default: 1000).
+ * @param seed Random seed (default: 42).
+ */
+void speedtest2(int n = 12, int num_calculations = 1000, int seed = 42);
+
+/**
  * @brief Perform random KL calculations in S_n.
  * @param n Size of the symmetric group.
  * @param num_calculations Number of random calculations to perform.

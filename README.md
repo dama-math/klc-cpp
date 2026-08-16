@@ -94,6 +94,7 @@ time ./klc_cpp 0123456789a 789a3456012
 | `--help` | — | Displays help. |
 | `--simple` | `w_perm` | Calculates $P_{e,w}(1)$, where $e$ is the identity. |
 | `--speedtest` | — | Runs a benchmark (all KL polynomials for $n \le 9$). |
+| `--speedtest2` | `[n] [num] [seed]` | Runs a benchmark calculating $P_{e,w}(q)$ for random permutations (default: $n=12$, 1000 calcs, seed 42). |
 | `--random` | `n [num] [seed]` | Runs `num` random KL calculations in $S_n$. |
 | `--file` | `filename` | Processes permutation pairs from a file. |
 | `--verify` | `filename` | Verifies calculations against expected results in a file. |

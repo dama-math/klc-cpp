@@ -12,6 +12,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Usage: " << argv[0] << " [options] \n"
                   << "Options:\n"
                   << "  --speedtest                       Speed test KL polynomial calculations\n"
+                  << "  --speedtest2 [n] [num] [seed]     Speed test with random permutations (default: n=12, num=1000, seed=42)\n"
                   << "  --random n [num] [seed]           Perform random KL calculations for S_n\n"
                   << "  --verify filename                 Verify KL polynomial calculations against a file\n"
                   << "  --cyclic n                        Run a fast cyclic permutation test for S_n\n"
@@ -23,6 +24,26 @@ int main(int argc, char* argv[]) {
 
     if (argc > 1 && std::string(argv[1]) == "--speedtest") {
         speedtest();
+        return 0;
+    }
+
+    if (argc > 1 && std::string(argv[1]) == "--speedtest2") {
+        if (argc > 5) {
+            std::cerr << "Usage: " << argv[0] << " --speedtest2 [n] [num_calculations] [seed]" << std::endl;
+            return 1;
+        }
+        int n = 12;
+        int num_calculations = 1000;
+        int seed = 42;
+        try {
+            if (argc > 2) n = std::stoi(argv[2]);
+            if (argc > 3) num_calculations = std::stoi(argv[3]);
+            if (argc > 4) seed = std::stoi(argv[4]);
+            speedtest2(n, num_calculations, seed);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: invalid argument: " << e.what() << std::endl;
+            return 1;
+        }
         return 0;
     }
 

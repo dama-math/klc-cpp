@@ -63,6 +63,38 @@ void speedtest() {
     std::cout << "Calculation finished." << std::endl;
 }
 
+void speedtest2(int n, int num_calculations, int seed) {
+    std::cout << "Speed test 2: Calculating P_{e,w}(q) for " << num_calculations
+              << " random permutations in S_" << n << " (seed: " << seed << ")..." << std::endl;
+
+    std::vector<int> p(n);
+    std::iota(p.begin(), p.end(), 0);
+    Permutation e(p);
+
+    std::mt19937 rng(seed);
+    std::vector<Permutation> permutations;
+    permutations.reserve(num_calculations);
+    for (int i = 0; i < num_calculations; ++i) {
+        std::shuffle(p.begin(), p.end(), rng);
+        permutations.emplace_back(p);
+    }
+
+    KLPolynomialCalculator calculator;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < num_calculations; ++i) {
+        calculator.calculate_kl(e, permutations[i]);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> diff = end - start;
+    std::cout << "Calculation finished." << std::endl;
+    std::cout << "Total time: " << std::fixed << std::setprecision(4) << diff.count() << " s" << std::endl;
+    if (num_calculations > 0) {
+        std::cout << "Average time: " << std::fixed << std::setprecision(4)
+                  << (diff.count() / num_calculations) * 1000.0 << " ms/calc" << std::endl;
+    }
+}
+
 void random_kl_calculations(int n, int num_calculations, int seed) {
     KLPolynomialCalculator calculator;
     
