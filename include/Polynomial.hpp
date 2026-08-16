@@ -1,72 +1,49 @@
 #pragma once
 
-#include <vector>
-#include <string>
-#include <numeric>
 #include <array>
+#include <initializer_list>
+#include <string>
+#include <vector>
 #include <cstdint>
+#include <algorithm>
 
 /**
- * @brief Represents a polynomial.
+ * @brief Represents a single-variable polynomial in q with integer coefficients.
  * 
- * Highly efficient fixed-size polynomial representation.
- * Avoids any heap allocation or variant overhead.
+ * Uses a fixed-size array buffer to eliminate heap allocations.
+ * Degree `deg = -1` represents the zero polynomial.
  */
 class Polynomial {
 public:
     static constexpr int MAX_CAPACITY = 32;
 
-    /** @brief Default constructor creating a zero polynomial. */
+    /** @brief Default constructor creating a zero polynomial (degree -1). */
     Polynomial() : deg(-1) {}
+
+    /** @brief Constructs a polynomial from a list of coefficients [a_0, a_1, ...]. */
+    Polynomial(std::initializer_list<long long> coeffs);
 
     /** @brief Constructs a polynomial from a vector of coefficients. */
     Polynomial(const std::vector<long long>& coeffs);
 
-    /** @return The degree of the polynomial. */
     int degree() const { return deg; }
+    bool is_zero() const { return deg < 0; }
 
-    /** @return Coefficient of the i-th power of q. */
+    /** @brief Returns coefficient of q^i (0 if out of range). */
     long long get_coeff(int i) const {
         if (i < 0 || i > deg) return 0;
         return data[i];
     }
 
-    /** @brief Equality operator. */
     bool operator==(const Polynomial& rhs) const;
 
-    /** @brief Addition assignment operator. */
-    Polynomial& operator+=(const Polynomial& rhs);
-
-    /** @brief Subtraction assignment operator. */
-    Polynomial& operator-=(const Polynomial& rhs);
-
-    /** @brief Addition operator. */
-    Polynomial operator+(const Polynomial& rhs) const;
-
-    /** @brief Subtraction operator. */
-    Polynomial operator-(const Polynomial& rhs) const;
-
-    /** @brief Multiplication assignment operator. */
+    /** @brief In-place polynomial multiplication (*this *= rhs). */
     Polynomial& operator*=(const Polynomial& rhs);
 
-    /** @brief Multiplication operator. */
-    Polynomial operator*(const Polynomial& rhs) const;
-
     /**
-     * @brief Shifts the polynomial by multiplying by q^amount.
-     * @param amount The power of q to multiply by.
-     * @return Shifted polynomial.
+     * @brief In-place addition: *this += rhs * (scalar * q^shift).
+     * Avoids creating temporary objects during recursive sum accumulation.
      */
-    Polynomial shift(int amount) const;
-
-    /**
-     * @brief Multiplies all coefficients by a scalar value.
-     * @param scalar The scalar value.
-     * @return Scaled polynomial.
-     */
-    Polynomial multiply_by_scalar(long long scalar) const;
-
-    /** @brief Directly adds rhs * q^shift to *this in-place without creating temporaries. */
     void add_shifted(const Polynomial& rhs, int shift, long long scalar = 1) {
         if (rhs.deg < 0 || scalar == 0) return;
         int needed_deg = rhs.deg + shift;
@@ -86,7 +63,10 @@ public:
         trim();
     }
 
-    /** @brief Directly subtracts rhs * q^shift to *this in-place without creating temporaries. */
+    /**
+     * @brief In-place subtraction: *this -= rhs * (scalar * q^shift).
+     * Avoids creating temporary objects during recursive correction subtraction.
+     */
     void subtract_shifted(const Polynomial& rhs, int shift, long long scalar = 1) {
         if (rhs.deg < 0 || scalar == 0) return;
         int needed_deg = rhs.deg + shift;
@@ -106,27 +86,14 @@ public:
         trim();
     }
 
-    /**
-     * @brief Evaluates the polynomial at a given value of q.
-     * @param q The value to substitute for q.
-     * @return Evaluated result.
-     */
+    /** @brief Evaluates the polynomial at q (e.g. q = 1). */
     long long substitute(long long q) const;
 
-    /** @return String representation of the polynomial. */
-    std::string to_string() const;
-
-    /** @return Simplified string representation (compact). */
+    /** @brief Formats coefficients as comma-separated values: "a_0,a_1,a_2,...". */
     std::string to_string_simple() const;
 
-    /** @return True if the polynomial is identically zero. */
-    bool is_zero() const { return deg < 0; }
-
-    const long long* data_ptr() const { return data.data(); }
-    long long* data_ptr_mut() { return data.data(); }
-
 private:
-    int deg = -1; // -1 for zero polynomial
+    int deg = -1;
     std::array<long long, MAX_CAPACITY> data{};
 
     void trim() {
@@ -135,5 +102,3 @@ private:
         }
     }
 };
-
-

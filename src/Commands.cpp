@@ -1,8 +1,7 @@
 #include "Commands.hpp"
-#include "Utils.hpp"
-#include "Lascoux.hpp"
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <numeric>
 #include <algorithm>
@@ -10,16 +9,6 @@
 #include <random>
 #include <iomanip>
 
-/**
- * @brief Processes a file containing pairs of permutations and calculates their KL polynomials.
- * 
- * Each line in the file should contain two space-separated permutations, x and w.
- * The function reads the file line by line, computes the KL polynomial P_{x,w}, 
- * and outputs the result to the standard output.
- * 
- * @param filename The path to the file to be processed.
- * @param calculator The KL polynomial calculator instance to use.
- */
 void process_file(const std::string& filename, KLPolynomialCalculator& calculator) {
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -50,27 +39,18 @@ void process_file(const std::string& filename, KLPolynomialCalculator& calculato
     }
 }
 
-/**
- * @brief Runs a speed test for KL polynomial calculations.
- * 
- * This function calculates the KL polynomial for all pairs (e, w) in the 
- * symmetric groups S_7 up to S_9, where e is the identity permutation.
- * It outputs the time taken for each group.
- */
 void speedtest() {
-    const int MAX_N_SPEED = 9;
+    constexpr int MAX_N_SPEED = 9;
     std::cout << "Calculating KLs for n <= " << MAX_N_SPEED << "..." << std::endl;
     KLPolynomialCalculator calculator;
 
     for (int n = 7; n <= MAX_N_SPEED; ++n) {
-        // Create the identity permutation
         std::vector<int> p_data(n);
         std::iota(p_data.begin(), p_data.end(), 0);
         Permutation e(p_data);
 
         auto start = std::chrono::high_resolution_clock::now();
         
-        // Iterate through all permutations in S_n
         do {
             Permutation w(p_data);
             calculator.calculate_kl(e, w);
@@ -83,20 +63,9 @@ void speedtest() {
     std::cout << "Calculation finished." << std::endl;
 }
 
-/**
- * @brief Performs a specified number of random KL polynomial calculations.
- * 
- * This function generates random permutations in S_n and computes 
- * their KL polynomials relative to the identity permutation.
- * 
- * @param n The size of the symmetric group.
- * @param num_calculations The number of random calculations to perform.
- * @param seed The random seed for reproducibility.
- */
 void random_kl_calculations(int n, int num_calculations, int seed) {
     KLPolynomialCalculator calculator;
     
-    // Create the identity permutation
     std::vector<int> p(n);
     std::iota(p.begin(), p.end(), 0);
     Permutation e(p);
@@ -106,7 +75,6 @@ void random_kl_calculations(int n, int num_calculations, int seed) {
               << " with seed " << seed << "..." << std::endl;
 
     for (int i = 0; i < num_calculations; ++i) {
-        // Generate a random permutation
         std::shuffle(p.begin(), p.end(), rng);
         Permutation w(p);
         
@@ -114,9 +82,9 @@ void random_kl_calculations(int n, int num_calculations, int seed) {
         Polynomial P_e_w = calculator.calculate_kl(e, w);
         
         std::cout << "Calc " << std::setw(3) << (i + 1) 
-              << ": w = " << std::setw(n) << std::left << w.to_string()
-              << ", l(w) = " << std::setw(3) << std::right << length
-              << ", P_e_w(q) = " << P_e_w.to_string_simple() << std::endl;
+                  << ": w = " << std::setw(n) << std::left << w.to_string()
+                  << ", l(w) = " << std::setw(3) << std::right << length
+                  << ", P_e_w(q) = " << P_e_w.to_string_simple() << std::endl;
     }
 }
 

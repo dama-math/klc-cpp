@@ -10,57 +10,43 @@
 #include "Config.hpp"
 
 /**
- * @brief Represents a permutation.
+ * @brief Represents a permutation in the symmetric group S_n.
  * 
- * Optimized to use a fixed-size array for storage (up to size 32).
- * This makes the class a trivial type (POD-like) for efficient copy and passing.
+ * Stored as a 0-indexed flat array of up to MAX_SIZE (16 in 64-bit mode, 24 in 128-bit mode)
+ * elements. Designed as a lightweight, trivially copyable value type.
  */
 class Permutation {
 public:
     static constexpr int MAX_SIZE = MAX_PACKED_SIZE;
-    using ValueType = int8_t; // 8-bit integer is enough for n <= 24
+    using ValueType = int8_t;
 
-    /** @brief Default constructor (empty permutation). */
+    /** @brief Constructs an empty permutation of size 0. */
     Permutation() : n(0) {}
 
-    /** @brief Construct directly from raw pointer (optimized). 
-     *  Assume data checks MAX_SIZE externally or trusted source. 
-     */
+    /** @brief Constructs a permutation directly from raw array buffer. */
     Permutation(const ValueType* data_ptr, int n_val) {
+        if (n_val > MAX_SIZE) {
+            throw std::length_error("Permutation size exceeds MAX_SIZE");
+        }
         n = n_val;
         std::copy(data_ptr, data_ptr + n, data.begin());
     }
 
-    /** @brief Construct from int pointer (requires cast/copy). */
-    Permutation(const int* data_ptr, int n_val) {
-        n = n_val;
-        for (int i = 0; i < n; ++i) {
-            data[i] = static_cast<ValueType>(data_ptr[i]);
-        }
-    }
-
-    /**
-     * @brief Constructs a permutation from a string (one-line notation).
-     * @param one_line_notation String representing the permutation (e.g., "123").
-     */
-    Permutation(const std::string& one_line_notation);
-
-    /**
-     * @brief Constructs a permutation from a vector of integers.
-     * @param data_vec Vector containing the permutation elements.
-     */
+    /** @brief Constructs a permutation from a vector of integers. */
     Permutation(const std::vector<int>& data_vec);
 
-    /** @return Constant iterator to the beginning. */
-    const ValueType* begin() const { return data.data(); }
+    /** @brief Constructs a permutation from a 0-indexed one-line notation string (e.g. "0213"). */
+    Permutation(const std::string& one_line_notation);
 
-    /** @return Constant iterator to the end. */
+    const ValueType* begin() const { return data.data(); }
     const ValueType* end() const { return data.data() + n; }
 
-    /** @return The size of the permutation. */
     int size() const { return n; }
 
-    /** @return The Coxeter length of the permutation. */
+    /**
+     * @brief Returns the Coxeter length (number of inversions) of the permutation.
+     * Computes inversions using hardware bit operations if not cached.
+     */
     int length() const {
         if (length_ != -1) return length_;
         int inversions = 0;
@@ -76,36 +62,26 @@ public:
         return length_;
     }
 
-    /** 
-     * @brief Direct access to elements.
-     * @param i Index.
-     */
     int operator[](int i) const { return data[i]; }
 
-    /**
-     * @brief Returns a copy of data as std::vector<int>.
-     * Primarily for legacy compatibility and printing.
-     */
-    std::vector<int> to_vector() const;
-    
-    // Low-level access for optimization (e.g. reductions)
+    /** @brief Direct buffer access for in-place algorithms (e.g., Bruhat reduction). */
     ValueType* data_ptr_mut() { return data.data(); }
     const ValueType* data_ptr() const { return data.data(); }
 
-    /** @brief Resets the cached length value. */
     void reset_length_cache() { length_ = -1; }
-    
     bool has_cached_length() const { return length_ != -1; }
-    
     void set_cached_length(int len) { length_ = len; }
 
-    /** @brief Sets size manually (use with caution when writing to data_ptr_mut directly). */
-    void set_size(int new_n) { 
-        if (new_n > MAX_SIZE) throw std::length_error("Permutation size exceeds MAX_SIZE");
-        n = new_n; 
+    void set_size(int new_n) {
+        if (new_n > MAX_SIZE) {
+            throw std::length_error("Permutation size exceeds MAX_SIZE");
+        }
+        n = new_n;
     }
 
-    /** @return A packed representation of the permutation as a PackedInt. */
+    /**
+     * @brief Packs permutation elements into an integer for fast hash table lookups.
+     */
     PackedInt pack() const {
         PackedInt packed = 0;
         for (int i = 0; i < n; ++i) {
@@ -114,47 +90,30 @@ public:
         return packed;
     }
 
-    /** @return The inverse permutation. */
+    /** @brief Returns the group-theoretic inverse permutation w^{-1}. */
     Permutation inverse() const {
-        Permutation new_perm;
-        new_perm.n = n;
+        Permutation inv;
+        inv.n = n;
         for (int i = 0; i < n; ++i) {
-            new_perm.data[static_cast<int>(data[i])] = static_cast<ValueType>(i);
+            inv.data[static_cast<int>(data[i])] = static_cast<ValueType>(i);
         }
-        if (this->length_ != -1) {
-            new_perm.length_ = this->length_;
-        }
-        return new_perm;
-    }
-
-    /** @return The Dynkin diagram automorphism permutation theta(w) = w_0 w w_0. */
-    Permutation theta() const {
-        Permutation new_perm;
-        new_perm.n = n;
-        for (int i = 0; i < n; ++i) {
-            new_perm.data[i] = static_cast<ValueType>((n - 1) - data[n - 1 - i]);
-        }
-        if (this->length_ != -1) {
-            new_perm.length_ = this->length_;
-        }
-        return new_perm;
+        inv.length_ = this->length_;
+        return inv;
     }
 
     /**
-     * @brief Multiplies the permutation by a simple transposition (i, i+1).
-     * @param i Index of the transposition.
-     * @return The resulting permutation.
+     * @brief Returns the permutation multiplied on the right by simple transposition s_i = (i, i+1).
+     * Efficiently updates the Coxeter length: l(w * s_i) = l(w) +- 1.
      */
     Permutation multiply_simple_transposition(int i) const {
-        Permutation new_perm = *this;
-        std::swap(new_perm.data[i], new_perm.data[i + 1]);
+        Permutation result = *this;
+        std::swap(result.data[i], result.data[i + 1]);
         if (this->length_ != -1) {
-            new_perm.length_ = (data[i] < data[i + 1]) ? (this->length_ + 1) : (this->length_ - 1);
+            result.length_ = (data[i] < data[i + 1]) ? (this->length_ + 1) : (this->length_ - 1);
         }
-        return new_perm;
+        return result;
     }
 
-    /** @brief Equality operator. */
     bool operator==(const Permutation& rhs) const {
         if (n != rhs.n) return false;
         for (int i = 0; i < n; ++i) {
@@ -162,27 +121,17 @@ public:
         }
         return true;
     }
-    
-    /** @return String representation in one-line notation. */
+
+    /** @brief Converts the permutation to one-line notation string. */
     std::string to_string() const;
 
-    /**
-     * @brief Converts a data vector to a one-line notation string.
-     * @param data Data vector.
-     * @return One-line notation string.
-     */
-    static std::string to_one_line_notation(const std::vector<int>& data);
+    /** @brief Converts elements to std::vector<int> for convenience. */
+    std::vector<int> to_vector() const;
 
 private:
-    std::array<ValueType, MAX_SIZE> data{}; ///< 0-indexed data.
-    int n;                 ///< Size of the permutation.
-    mutable int length_ = -1; ///< Cached length.
+    std::array<ValueType, MAX_SIZE> data{};
+    int n = 0;
+    mutable int length_ = -1;
 
-    /**
-     * @brief Parses a one-line notation string.
-     * @param notation One-line notation string.
-     * @return Data vector.
-     */
-    static std::vector<int> from_one_line_notation(const std::string& notation);
+    void parse_one_line_notation(const std::string& notation);
 };
-

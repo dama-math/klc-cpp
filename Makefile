@@ -9,7 +9,7 @@ ifeq ($(BIG_N),1)
 endif
 
 # --- Variables ---
-SRCS = main.cpp src/Polynomial.cpp src/Permutation.cpp src/Bruhat.cpp src/KLCalculator.cpp src/Lascoux.cpp src/Commands.cpp src/Utils.cpp
+SRCS = main.cpp src/Polynomial.cpp src/Permutation.cpp src/Bruhat.cpp src/KLCalculator.cpp src/Lascoux.cpp src/Commands.cpp
 OBJDIR = obj
 OBJS = $(addprefix $(OBJDIR)/,$(notdir $(SRCS:.cpp=.o)))
 TARGET = klc_cpp

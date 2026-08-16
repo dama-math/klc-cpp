@@ -6,13 +6,7 @@
 #include "Permutation.hpp"
 #include "KLCalculator.hpp"
 #include "Commands.hpp"
-#include "Utils.hpp"
 
-/**
- * @brief Entry point for the KL polynomial calculator.
- * 
- * Provides various options to compute KL polynomials and perform tests.
- */
 int main(int argc, char* argv[]) {
     if (argc > 1 && std::string(argv[1]) == "--help") {
         std::cout << "Usage: " << argv[0] << " [options] \n"

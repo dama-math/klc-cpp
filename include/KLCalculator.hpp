@@ -4,37 +4,31 @@
 #include "Permutation.hpp"
 #include "Polynomial.hpp"
 #include <unordered_map>
-#include <string>
-#include <vector>
-#include <utility> // For std::pair
+#include <utility>
 
 /**
  * @brief High-performance Kazhdan-Lusztig polynomial calculator.
  * 
- * Implements various algorithms including the standard recursive formula and
- * Lascoux's optimization for pattern-free permutations. Employs advanced
- * caching (interning, fast maps) to eliminate redundant calculations.
+ * Computes KL polynomials P_{x, w}(q) using Warrington's recursive algorithm
+ * with pair reductions, SIMD-accelerated extremal pair searches, covering relation
+ * filtering, and memoization. Also supports Lascoux's fast algorithm for vexillary
+ * (3412-avoiding) permutations.
  */
 class KLPolynomialCalculator {
 public:
-    /** @brief Default constructor. */
     KLPolynomialCalculator();
 
     /**
-     * @brief Calculates the Kazhdan-Lusztig polynomial P_{x, w}(q).
+     * @brief Computes the Kazhdan-Lusztig polynomial P_{x, w}(q).
      * 
      * @param x Inner permutation.
      * @param w Outer permutation.
-     * @param use_lascoux If true, attempt to use Lascoux's algorithm for pattern-free permutations.
-     * @return The computed Kazhdan-Lusztig polynomial.
+     * @param use_lascoux If true, uses Lascoux's method when w is 3412-avoiding.
+     * @return The computed polynomial (0 if x is not <= w in Bruhat order).
      */
     Polynomial calculate_kl(const Permutation& x, const Permutation& w, bool use_lascoux = true);
 
-    /** 
-     * @brief Clears the internal computation caches.
-     * 
-     * Frees all stored polynomials and partially computed values to reclaim memory.
-     */
+    /** @brief Clears memoization tables for polynomials and mu coefficients. */
     void clear_cache();
 
 private:
@@ -60,51 +54,25 @@ private:
 
     using PermPair = std::pair<PackedInt, PackedInt>;
 
-    // Fast Cache mapping packed permutation pairs to polynomials
+    // Memoization table for full polynomials P_{x, w}(q)
     std::unordered_map<PermPair, Polynomial, FastPermPairHasher> cache; 
     
-    // Fast Cache for tracking intermediate mu coefficients
+    // Memoization table for leading mu coefficients mu(x, w)
     std::unordered_map<PermPair, long long, FastPermPairHasher> mu_cache;
 
-    /** @brief Core recursive function for standard KL calculation. */
+    // --- Core Recurrences ---
     Polynomial get_kl_recursive(Permutation x, Permutation w, bool already_bruhat_checked);
-
-    /** @brief Coordinates the application of all correction terms for a recursive step. */
-    void apply_correction_term(
-        Polynomial& poly, const Permutation& x, const Permutation& ws, int s_index);
-
-    /** @brief Finds and applies correction polynomials derived from extremal pairs. */
-    void find_extremal_pairs_and_correct(
-        Polynomial& poly, const Permutation& x, const Permutation& ws, int s_index);
-
-    /** @brief Finds and applies correction polynomials derived from covering relations. */
-    void find_covering_relations_and_correct(
-        Polynomial& poly, const Permutation& x, const Permutation& ws, int s_index);
-
-    /** @brief Performs polynomial subtraction for a specific valid element z. */
-    void perform_correction(
-        Polynomial& poly, const Permutation& x, const Permutation& ws, const Permutation& z);
-
-    /** @brief Retrieves the raw mu coefficient for a specific pair. */
-    long long get_mu_coefficient(const Permutation& z, const Permutation& ws);
-
-    /** @brief Core recursive function dedicated to computing mu coefficients rapidly. */
     long long get_mu_recursive(Permutation x, Permutation w, bool already_bruhat_checked);
 
-    /** @brief Orchestrates corrections during mu coefficient derivation. */
-    void mu_apply_correction_term(
-        long long& current_mu, const Permutation& x, const Permutation& ws, int s_index);
+    // --- Correction Terms for P_{x, w}(q) ---
+    void apply_correction_term(Polynomial& poly, const Permutation& x, const Permutation& ws, int s_index);
+    void find_extremal_pairs_and_correct(Polynomial& poly, const Permutation& x, const Permutation& ws, int s_index);
+    void find_covering_relations_and_correct(Polynomial& poly, const Permutation& x, const Permutation& ws, int s_index);
+    void perform_correction(Polynomial& poly, const Permutation& x, const Permutation& ws, const Permutation& z);
 
-    /** @brief Corrects mu based on relevant extremal pairs. */
-    void mu_find_extremal_pairs_and_correct(
-        long long& current_mu, const Permutation& x, const Permutation& ws, int s_index);
-
-    /** @brief Corrects mu based on relevant covering relations. */
-    void mu_find_covering_relations_and_correct(
-        long long& current_mu, const Permutation& x, const Permutation& ws, int s_index);
-
-    /** @brief Subtracts the mu product correction for a specific valid element z. */
-    void mu_perform_correction(
-        long long& current_mu, const Permutation& x, const Permutation& ws, const Permutation& z);
-
+    // --- Correction Terms for mu(x, w) ---
+    void mu_apply_correction_term(long long& current_mu, const Permutation& x, const Permutation& ws, int s_index);
+    void mu_find_extremal_pairs_and_correct(long long& current_mu, const Permutation& x, const Permutation& ws, int s_index);
+    void mu_find_covering_relations_and_correct(long long& current_mu, const Permutation& x, const Permutation& ws, int s_index);
+    void mu_perform_correction(long long& current_mu, const Permutation& x, const Permutation& ws, const Permutation& z);
 };

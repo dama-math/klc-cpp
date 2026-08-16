@@ -1,33 +1,28 @@
 #include "Bruhat.hpp"
-#include <vector>
-#include <numeric>
 #include <algorithm>
-#include <iostream>
+#include <bit>
+#include <cstdint>
 
 namespace Bruhat {
 
-// Anonymous namespace for internal helper functions and logic
 namespace {
 
-using ValueType = int8_t; // Must match Permutation::ValueType
-constexpr ValueType REMOVED = -1;
+using ValueType = Permutation::ValueType;
+constexpr ValueType REMOVED_MARKER = -1;
 
 /**
- * @brief Attempts to apply an extremal pair reduction in place.
+ * @brief Enforces extremal-pair conditions on (x, w) by performing descent-preserving swaps on x.
  * 
- * Modifies the data arrays directly to transform the pair into an extremal pair
- * if possible, using inversion swaps.
+ * If w has a descent at index i (or w^{-1} at index i) where x has an ascent,
+ * swapping the corresponding elements in x preserves the KL polynomial while increasing l(x).
  * 
- * @param x_data Array pointer to the inner permutation data.
- * @param w_data Array pointer to the outer permutation data.
- * @param n Size of the permutations.
- * @return True if the inner permutation 'x' was modified, false otherwise.
+ * @return Total number of swaps performed on x.
  */
-int make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
+int make_extremal_pair_inplace(ValueType* x_data, const ValueType* w_data, int n) {
     if (n <= 1) return 0;
     
-    ValueType x_inv[32];
-    ValueType w_inv[32];
+    ValueType x_inv[Permutation::MAX_SIZE];
+    ValueType w_inv[Permutation::MAX_SIZE];
     
     for (int i = 0; i < n; ++i) {
         x_inv[static_cast<int>(x_data[i])] = static_cast<ValueType>(i);
@@ -49,6 +44,7 @@ int make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
     while (changed) {
         changed = false;
         
+        // Check right descents
         uint32_t mask = w_desc;
         while (mask) {
             int i = std::countr_zero(mask);
@@ -63,6 +59,7 @@ int make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
             }
         }
         
+        // Check left descents (descents in inverse permutation)
         uint32_t inv_mask = w_inv_desc;
         while (inv_mask) {
             int i = std::countr_zero(inv_mask);
@@ -79,37 +76,33 @@ int make_ep_inplace(ValueType* x_data, ValueType* w_data, int n) {
 }
 
 /**
- * @brief Analyzes and marks elements that can be eliminated (tilde reduction).
+ * @brief Identifies fixed points x[i] == w[i] that do not cross any active intervals (tilde-reduction).
  * 
- * Elements marked for elimination are replaced with -1.
+ * If x[i] == w[i] and the net interval crossing count dxw is 0, element i does not affect
+ * the KL polynomial and can be removed from both permutations.
  * 
- * @param x_data Array pointer to the inner permutation data.
- * @param w_data Array pointer to the outer permutation data.
- * @param n Size of the permutations.
- * @return The number of elements successfully marked for removal.
+ * @return Number of elements marked as REMOVED_MARKER.
  */
-int tilde_inplace(ValueType* x_data, ValueType* w_data, int n) {
+int tilde_reduction_inplace(ValueType* x_data, ValueType* w_data, int n) {
     if (n <= 1) return 0;
     int removed_count = 0;
 
     for (int i = 0; i < n; ++i) {
         if (x_data[i] == w_data[i]) {
-            int x = x_data[i];
+            int x_val = x_data[i];
             int dxw = 0;
-            // Compute dxw_row[x] by looking at all previous elements
             for (int j = 0; j < i; ++j) {
                 int xj = x_data[j];
                 int wj = w_data[j];
-                if (xj <= x && x < wj) {
+                if (xj <= x_val && x_val < wj) {
                     dxw++;
-                } else if (wj <= x && x < xj) {
+                } else if (wj <= x_val && x_val < xj) {
                     dxw--;
                 }
             }
-            // Elements that are identical and have no overlapping intervals can be removed
             if (dxw == 0) {
-                x_data[i] = REMOVED;
-                w_data[i] = REMOVED;
+                x_data[i] = REMOVED_MARKER;
+                w_data[i] = REMOVED_MARKER;
                 removed_count++;
             }
         }
@@ -118,27 +111,20 @@ int tilde_inplace(ValueType* x_data, ValueType* w_data, int n) {
 }
 
 /**
- * @brief Flattens the permutations after tilde reduction.
- * 
- * Compacts the data arrays by removing elements marked as -1 and re-indexing
- * the remaining elements sequentially.
- * 
- * @param x_data Array pointer to the inner permutation data.
- * @param w_data Array pointer to the outer permutation data.
- * @param n Reference to the permutation size (updated upon completion).
+ * @brief Compacts the permutation arrays after removing elements, re-indexing values to 0..n'-1.
  */
 void flatten_inplace(ValueType* x_data, ValueType* w_data, int& n) {
     if (n == 0) return;
 
     uint32_t active_vals = 0;
     for (int i = 0; i < n; ++i) {
-        if (x_data[i] != REMOVED) {
+        if (x_data[i] != REMOVED_MARKER) {
             active_vals |= (1u << x_data[i]);
             active_vals |= (1u << w_data[i]);
         }
     }
     
-    ValueType rank_table[32];
+    ValueType rank_table[Permutation::MAX_SIZE];
     int r = 0;
     uint32_t m = active_vals;
     while (m) {
@@ -149,18 +135,16 @@ void flatten_inplace(ValueType* x_data, ValueType* w_data, int& n) {
 
     int write_idx = 0;
     for (int i = 0; i < n; ++i) {
-        if (x_data[i] != REMOVED) {
+        if (x_data[i] != REMOVED_MARKER) {
             x_data[write_idx] = rank_table[static_cast<int>(x_data[i])];
             w_data[write_idx] = rank_table[static_cast<int>(w_data[i])];
             ++write_idx;
         }
     }
-    n = write_idx; // Update physical size
+    n = write_idx;
 }
 
-} // namespace
-
-// --- Public API Functions ---
+} // anonymous namespace
 
 bool reduce(Permutation& x, Permutation& w) {
     auto* x_data = x.data_ptr_mut();
@@ -175,14 +159,14 @@ bool reduce(Permutation& x, Permutation& w) {
     int orig_x_len = x.has_cached_length() ? x.length() : -1;
 
     while (true) {
-        int swaps = make_ep_inplace(x_data, w_data, n);
+        int swaps = make_extremal_pair_inplace(x_data, w_data, n);
         if (first_iteration && swaps > 0) {
             originally_ep = false;
         }
         first_iteration = false;
         total_swaps += swaps;
 
-        int removed = tilde_inplace(x_data, w_data, n);
+        int removed = tilde_reduction_inplace(x_data, w_data, n);
         if (removed > 0) {
             any_removals = true;
             flatten_inplace(x_data, w_data, n);

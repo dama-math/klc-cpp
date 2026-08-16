@@ -4,30 +4,22 @@
 #include "Polynomial.hpp"
 
 /**
- * @brief Namespace for Lascoux's algorithm and related optimizations.
+ * @brief Lascoux's algorithm for Kazhdan-Lusztig polynomials of 3412-avoiding (vexillary) permutations.
  */
 namespace Lascoux {
 
 /**
- * @brief Checks if a permutation contains a 3412 pattern.
+ * @brief Checks if permutation p contains a 3412 pattern.
  * 
- * A permutation has a 3412 pattern if there exist indices i < j < k < l
- * such that w[k] < w[l] < w[i] < w[j].
- * 
- * @param p The permutation to check.
- * @return True if the pattern exists, false otherwise.
+ * A permutation contains 3412 if there exist indices i < j < k < l such that
+ * p[k] < p[l] < p[i] < p[j].
  */
 bool has_3412_pattern(const Permutation& p);
 
 /**
- * @brief Calculates the Kazhdan-Lusztig polynomial using Lascoux's algorithm.
+ * @brief Computes the KL polynomial P_{x, w}(q) using Lascoux's tree method.
  * 
- * This algorithm is specifically optimized for permutations that do not contain
- * a 3412 pattern. It significantly speeds up computations for such permutations.
- * 
- * @param x The inner permutation.
- * @param w The outer permutation.
- * @return The calculated Kazhdan-Lusztig polynomial.
+ * Applicable when w is 3412-avoiding (vexillary).
  */
 Polynomial calculate_kl(const Permutation& x, const Permutation& w);
 
