@@ -6,7 +6,8 @@
 #include <array>
 #include <stdexcept>
 #include <bit>
-#include <algorithm>
+#include <cstring>
+#include <immintrin.h>
 #include "Config.hpp"
 
 /**
@@ -53,9 +54,7 @@ public:
         uint32_t seen = 0;
         for (int i = 0; i < n; ++i) {
             int v = data[i];
-            if (v < 31) {
-                inversions += std::popcount(seen >> (v + 1));
-            }
+            inversions += std::popcount(seen >> (v + 1));
             seen |= (1u << v);
         }
         length_ = inversions;

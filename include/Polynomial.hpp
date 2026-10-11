@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstdint>
 #include <algorithm>
+#include <cstring>
 
 /**
  * @brief Represents a single-variable polynomial in q with integer coefficients.
@@ -15,7 +16,7 @@
  */
 class Polynomial {
 public:
-    static constexpr int MAX_CAPACITY = 32;
+    static constexpr int MAX_CAPACITY = 64;
 
     /** @brief Default constructor creating a zero polynomial (degree -1). */
     Polynomial() : deg(-1) {}
@@ -48,7 +49,7 @@ public:
         if (rhs.deg < 0 || scalar == 0) return;
         int needed_deg = rhs.deg + shift;
         if (deg < needed_deg) {
-            std::fill(data.begin() + deg + 1, data.begin() + needed_deg + 1, 0);
+            for (int i = deg + 1; i <= needed_deg; ++i) data[i] = 0;
             deg = needed_deg;
         }
         if (scalar == 1) {
@@ -71,7 +72,7 @@ public:
         if (rhs.deg < 0 || scalar == 0) return;
         int needed_deg = rhs.deg + shift;
         if (deg < needed_deg) {
-            std::fill(data.begin() + deg + 1, data.begin() + needed_deg + 1, 0);
+            for (int i = deg + 1; i <= needed_deg; ++i) data[i] = 0;
             deg = needed_deg;
         }
         if (scalar == 1) {

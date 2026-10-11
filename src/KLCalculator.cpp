@@ -16,28 +16,6 @@ constexpr int MAX_N_OPT = 16;
  * @brief Computes the 2D rank matrix rank(p[1..i, 1..j]) into a row-major flat buffer.
  * Stride between consecutive rows is MAX_N_OPT (16 bytes) for direct SIMD loads.
  */
-inline void compute_rx_matrix_flat(const Permutation& p, int8_t* buffer, int n) {
-    if (n == 0) return;
-    
-    // First row
-    int p0 = p[0];
-    for (int j = 0; j <= p0; ++j) buffer[j] = 1;
-    for (int j = p0 + 1; j < MAX_N_OPT; ++j) buffer[j] = 0;
-    
-    // Remaining rows: curr_row[j] = prev_row[j] + (p[i] <= j ? 1 : 0)
-    for (int i = 1; i < n; ++i) {
-        const int8_t* prev_row = buffer + (i - 1) * MAX_N_OPT;
-        int8_t* curr_row = buffer + i * MAX_N_OPT;
-        int val = p[i];
-        for (int j = 0; j <= val; ++j) {
-            curr_row[j] = static_cast<int8_t>(prev_row[j] + 1);
-        }
-        for (int j = val + 1; j < MAX_N_OPT; ++j) {
-            curr_row[j] = prev_row[j];
-        }
-    }
-}
-
 // 16-byte aligned indicator vectors: row i has 1s in columns 0..i and 0s elsewhere
 alignas(16) static const int8_t MASK_LE_TABLE[16][16] = {
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -59,6 +37,23 @@ alignas(16) static const int8_t MASK_LE_TABLE[16][16] = {
 };
 
 /**
+ * @brief Computes the 2D rank matrix rank(p[1..i, 1..j]) into a row-major flat buffer.
+ * Stride between consecutive rows is MAX_N_OPT (16 bytes) for direct SIMD loads.
+ */
+inline void compute_rx_matrix_flat(const Permutation& p, int8_t* buffer, int n) {
+    if (n == 0) return;
+    
+    __m128i row = _mm_load_si128(reinterpret_cast<const __m128i*>(MASK_LE_TABLE[p[0]]));
+    _mm_store_si128(reinterpret_cast<__m128i*>(buffer), row);
+    
+    for (int i = 1; i < n; ++i) {
+        __m128i mask = _mm_load_si128(reinterpret_cast<const __m128i*>(MASK_LE_TABLE[p[i]]));
+        row = _mm_add_epi8(row, mask);
+        _mm_store_si128(reinterpret_cast<__m128i*>(buffer + i * MAX_N_OPT), row);
+    }
+}
+
+/**
  * @brief SIMD depth-first search for permutations z in [x, ws] that are extremal w.r.t. ws
  * and have a descent at s_index.
  */
@@ -71,8 +66,8 @@ inline void search_extremal_pairs(const Permutation& x, const Permutation& ws, i
 
     const auto* ws_ptr = ws.begin();
 
-    alignas(16) int8_t x_rx_buf[MAX_N_OPT * MAX_N_OPT] = {0};
-    alignas(16) int8_t ws_rx_buf[MAX_N_OPT * MAX_N_OPT] = {0};
+    alignas(16) int8_t x_rx_buf[MAX_N_OPT * MAX_N_OPT];
+    alignas(16) int8_t ws_rx_buf[MAX_N_OPT * MAX_N_OPT];
     compute_rx_matrix_flat(x, x_rx_buf, n);
     compute_rx_matrix_flat(ws, ws_rx_buf, n);
 
@@ -84,39 +79,38 @@ inline void search_extremal_pairs(const Permutation& x, const Permutation& ws, i
         }
     }
 
-    // Precompute right and left descent bitmasks for ws
-    unsigned int ws_rds_mask = 0;
-    unsigned int ws_lds_mask = 0;
-    
-    int8_t ws_inv[MAX_N_OPT];
+    // Precompute right and left descent bitmasks for ws using SIMD
+    __m128i ws_v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(ws_ptr));
+    __m128i ws_v_shift = _mm_srli_si128(ws_v, 1);
+    unsigned int ws_rds_mask = _mm_movemask_epi8(_mm_cmpgt_epi8(ws_v, ws_v_shift)) & ((1u << (n - 1)) - 1);
+
+    alignas(16) int8_t ws_inv[MAX_N_OPT];
     for (int i = 0; i < n; ++i) {
         ws_inv[static_cast<int>(ws_ptr[i])] = static_cast<int8_t>(i);
     }
-    
-    for (int i = 0; i < n - 1; ++i) {
-        if (ws_ptr[i] > ws_ptr[i + 1]) ws_rds_mask |= (1u << i);
-        if (ws_inv[i] > ws_inv[i + 1]) ws_lds_mask |= (1u << i);
-    }
+    __m128i inv_v = _mm_load_si128(reinterpret_cast<const __m128i*>(ws_inv));
+    __m128i inv_v_shift = _mm_srli_si128(inv_v, 1);
+    unsigned int ws_lds_mask = _mm_movemask_epi8(_mm_cmpgt_epi8(inv_v, inv_v_shift)) & ((1u << (n - 1)) - 1);
 
     // Augmented descent mask: z must have descents where ws has descents, plus at s_index
     const unsigned int augmented_rds_mask = ws_rds_mask | (s_index >= 0 ? (1u << s_index) : 0);
     int8_t z_path[MAX_N_OPT];
 
-    auto dfs = [&](auto self, int depth, unsigned int used_mask, int current_length, __m128i col) -> void {
-        if (depth == n) {
-            Permutation z(z_path, n);
-            z.set_cached_length(current_length);
-            callback(z);
-            return;
-        }
+    if (n == 0) return;
+    if (n == 1) {
+        Permutation z = x;
+        callback(z);
+        return;
+    }
 
+    auto dfs = [&](auto self, int depth, unsigned int used_mask, int current_length, __m128i col) -> bool {
         const __m128i ws_rx_k = _mm_load_si128(reinterpret_cast<const __m128i*>(ws_rx_buf + depth * MAX_N_OPT));
         const __m128i x_rx_k = _mm_load_si128(reinterpret_cast<const __m128i*>(x_rx_buf + depth * MAX_N_OPT));
 
         int max_allowed_i = n - 1;
         if (depth > 0 && (augmented_rds_mask & (1u << (depth - 1)))) {
             int prev = static_cast<int>(z_path[depth - 1]);
-            if (prev == 0) return;
+            if (prev == 0) return true;
             max_allowed_i = prev - 1;
         }
 
@@ -124,8 +118,25 @@ inline void search_extremal_pairs(const Permutation& x, const Permutation& ws, i
         unsigned int rejected_lds = ws_lds_mask & (~used_mask >> 1);
         unsigned int avail_mask = ~used_mask & max_mask & ~rejected_lds;
 
-        alignas(16) int8_t col_arr[16];
-        _mm_store_si128(reinterpret_cast<__m128i*>(col_arr), col);
+        if (depth == n - 1) {
+            if (avail_mask) {
+                int i = std::countr_zero(avail_mask);
+                __m128i mask_i = _mm_load_si128(reinterpret_cast<const __m128i*>(MASK_LE_TABLE[i]));
+                __m128i rz = _mm_add_epi8(col, mask_i);
+
+                __m128i bad_ws = _mm_cmpgt_epi8(rz, ws_rx_k);
+                __m128i bad_x = _mm_cmpgt_epi8(x_rx_k, rz);
+                __m128i bad = _mm_or_si128(bad_ws, bad_x);
+                if (_mm_testz_si128(bad, bad)) {
+                    int inv_added = std::popcount(used_mask >> (i + 1));
+                    z_path[n - 1] = static_cast<int8_t>(i);
+                    Permutation z(z_path, n);
+                    z.set_cached_length(current_length + inv_added);
+                    return callback(z);
+                }
+            }
+            return true;
+        }
 
         while (avail_mask) {
             int i = std::countr_zero(avail_mask);
@@ -145,11 +156,14 @@ inline void search_extremal_pairs(const Permutation& x, const Permutation& ws, i
                 continue;
             }
 
-            int inv_added = col_arr[i + 1];
+            int inv_added = std::popcount(used_mask >> (i + 1));
             z_path[depth] = static_cast<int8_t>(i);
             
-            self(self, depth + 1, used_mask | mask_bit, current_length + inv_added, rz);
+            if (!self(self, depth + 1, used_mask | mask_bit, current_length + inv_added, rz)) {
+                return false;
+            }
         }
+        return true;
     };
 
     dfs(dfs, 0, 0, 0, _mm_setzero_si128());
@@ -275,8 +289,8 @@ Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w
     }
 
     const auto key = std::make_pair(x.pack(), w.pack());
-    if (auto it = cache.find(key); it != cache.end()) {
-        return it->second;
+    if (auto* cached = cache.find(key)) {
+        return *cached;
     }
 
     int s_index = select_descent_index(w);
@@ -294,8 +308,8 @@ Polynomial KLPolynomialCalculator::get_kl_recursive(Permutation x, Permutation w
 
     apply_correction_term(result, x, ws, s_index);
     
-    cache.insert({key, result});
-    mu_cache[key] = result.get_coeff((w.length() - x.length() - 1) / 2);
+    cache.insert_or_assign(key, result);
+    mu_cache.insert_or_assign(key, result.get_coeff((w.length() - x.length() - 1) / 2));
     return result;
 }
 
@@ -315,6 +329,7 @@ void KLPolynomialCalculator::find_extremal_pairs_and_correct(
         if (len_diff > 0 && (len_diff % 2 != 0)) {
             perform_correction(poly, x, ws, z);
         }
+        return true;
     });
 }
 
@@ -373,8 +388,8 @@ long long KLPolynomialCalculator::get_mu_recursive(Permutation x, Permutation w,
     }
 
     const auto key = std::make_pair(x.pack(), w.pack());
-    if (auto it = mu_cache.find(key); it != mu_cache.end()) {
-        return it->second;
+    if (auto* cached = mu_cache.find(key)) {
+        return *cached;
     }
 
     int s_index = select_descent_index(w);
@@ -390,12 +405,12 @@ long long KLPolynomialCalculator::get_mu_recursive(Permutation x, Permutation w,
 
     long long result = p_x_ws.get_coeff((len_diff - 3) / 2) + mu_xs_ws;
     if (result == 0) {
-        mu_cache[key] = 0;
+        mu_cache.insert_or_assign(key, 0);
         return 0;
     }
 
     mu_apply_correction_term(result, x, ws, s_index);
-    mu_cache[key] = result;
+    mu_cache.insert_or_assign(key, result);
     return result;
 }
 
@@ -421,7 +436,9 @@ void KLPolynomialCalculator::mu_find_extremal_pairs_and_correct(
         if (len_diff_z_ws > 1 && (len_diff_z_ws % 2 != 0) &&
             len_diff_x_z > 0 && (len_diff_x_z % 2 != 0)) {
             mu_perform_correction(current_mu, x, ws, z);
+            if (current_mu == 0) return false;
         }
+        return true;
     });
 }
 

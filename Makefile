@@ -22,10 +22,12 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(OBJDIR)/%.o: src/%.cpp | $(OBJDIR)
+INCLUDES = $(wildcard include/*.hpp)
+
+$(OBJDIR)/%.o: src/%.cpp $(INCLUDES) | $(OBJDIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(OBJDIR)/main.o: main.cpp | $(OBJDIR)
+$(OBJDIR)/main.o: main.cpp $(INCLUDES) | $(OBJDIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJDIR):

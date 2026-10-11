@@ -56,11 +56,26 @@ inline bool is_extremal_pair(const Permutation& x, const Permutation& w) {
     return true;
 }
 
+struct DiffIntervalTable {
+    alignas(16) int8_t data[16][16][16];
+    constexpr DiffIntervalTable() : data{} {
+        for (int a = 0; a < 16; ++a) {
+            for (int b = 0; b < 16; ++b) {
+                for (int k = 0; k < 16; ++k) {
+                    data[a][b][k] = (k >= a && k < b) ? 1 : 0;
+                }
+            }
+        }
+    }
+};
+
+inline constexpr DiffIntervalTable DIFF_INTERVAL_TABLE_HOLDER;
+#define DIFF_INTERVAL_TABLE DIFF_INTERVAL_TABLE_HOLDER.data
+
 /**
  * @brief Checks if permutation x is less than or equal to w in the strong Bruhat order (x <= w).
  * 
- * Uses the subword/tableau criterion by incrementally verifying that the rank matrices
- * satisfy rank(x[1..i, 1..j]) >= rank(w[1..i, 1..j]).
+ * Uses SIMD parallel interval additions/subtractions on 16-byte diff vector.
  */
 inline bool is_bruhat_less_than(const Permutation& x, const Permutation& w) {
     if (x.size() != w.size()) return false;
@@ -73,23 +88,22 @@ inline bool is_bruhat_less_than(const Permutation& x, const Permutation& w) {
     if (x_len > w_len) return false;
     if (x_len == w_len) return x == w;
     
-    int8_t diff_row[Permutation::MAX_SIZE] = {0};
-
     const auto* x_ptr = x.begin();
     const auto* w_ptr = w.begin();
+
+    __m128i diff = _mm_setzero_si128();
 
     for (int i = 0; i < n; ++i) {
         int xi = x_ptr[i];
         int wi = w_ptr[i];
         
         if (xi < wi) {
-            for (int j = xi; j < wi; ++j) {
-                diff_row[j]++;
-            }
+            __m128i mask = _mm_loadu_si128(reinterpret_cast<const __m128i*>(DIFF_INTERVAL_TABLE[xi][wi]));
+            diff = _mm_add_epi8(diff, mask);
         } else if (xi > wi) {
-            for (int j = wi; j < xi; ++j) {
-                if (--diff_row[j] < 0) return false;
-            }
+            __m128i mask = _mm_loadu_si128(reinterpret_cast<const __m128i*>(DIFF_INTERVAL_TABLE[wi][xi]));
+            diff = _mm_sub_epi8(diff, mask);
+            if (_mm_movemask_epi8(diff) != 0) return false;
         }
     }
 
