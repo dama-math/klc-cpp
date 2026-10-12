@@ -3,11 +3,10 @@
 #include <stdexcept>
 
 Polynomial::Polynomial(std::initializer_list<long long> coeffs) {
-    deg = static_cast<int>(coeffs.size()) - 1;
-    if (deg >= MAX_CAPACITY) {
+    if (coeffs.size() > MAX_CAPACITY) {
         throw std::length_error("Polynomial degree exceeds MAX_CAPACITY");
     }
-    data.fill(0);
+    deg = static_cast<int>(coeffs.size()) - 1;
     size_t i = 0;
     for (long long c : coeffs) {
         data[i++] = c;
@@ -16,11 +15,10 @@ Polynomial::Polynomial(std::initializer_list<long long> coeffs) {
 }
 
 Polynomial::Polynomial(const std::vector<long long>& coeffs) {
-    deg = static_cast<int>(coeffs.size()) - 1;
-    if (deg >= MAX_CAPACITY) {
+    if (coeffs.size() > MAX_CAPACITY) {
         throw std::length_error("Polynomial degree exceeds MAX_CAPACITY");
     }
-    data.fill(0);
+    deg = static_cast<int>(coeffs.size()) - 1;
     for (size_t i = 0; i < coeffs.size(); ++i) {
         data[i] = coeffs[i];
     }
@@ -47,7 +45,8 @@ Polynomial& Polynomial::operator*=(const Polynomial& rhs) {
         long long c = data[i];
         if (c == 0) continue;
         for (int j = 0; j <= rhs.deg; ++j) {
-            buf[i + j] += c * rhs.data[j];
+            buf[i + j] = klc::detail::checked_add(buf[i + j],
+                klc::detail::checked_multiply(c, rhs.data[j]));
         }
     }
     data = buf;
@@ -58,11 +57,10 @@ Polynomial& Polynomial::operator*=(const Polynomial& rhs) {
 
 long long Polynomial::substitute(long long q) const {
     if (deg < 0) return 0;
-    long long result = 0;
-    long long q_power = 1;
-    for (int i = 0; i <= deg; ++i) {
-        result += data[i] * q_power;
-        q_power *= q;
+    long long result = data[deg];
+    for (int i = deg - 1; i >= 0; --i) {
+        result = klc::detail::checked_add(
+            klc::detail::checked_multiply(result, q), data[i]);
     }
     return result;
 }

@@ -1,4 +1,4 @@
-from sympy import symbols, Poly, factor
+from sympy import symbols, factor
 
 x = symbols('x')
 

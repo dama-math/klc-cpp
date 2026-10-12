@@ -19,7 +19,8 @@ bool has_3412_pattern(const Permutation& p);
 /**
  * @brief Computes the KL polynomial P_{x, w}(q) using Lascoux's tree method.
  * 
- * Applicable when w is 3412-avoiding (vexillary).
+ * Returns zero when x is not <= w. Throws for mismatched sizes or a nontrivial
+ * request with a 3412 pattern in w. Library errors never write to stdout/stderr.
  */
 Polynomial calculate_kl(const Permutation& x, const Permutation& w);
 

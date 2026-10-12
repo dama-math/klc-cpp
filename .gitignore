@@ -15,6 +15,10 @@
 *.pyo
 *.pyd
 __pycache__/
+obj/
+.refactor/
+build/
+verify.generated.txt
 klc_cpp
 report*
 callgrind.out.*

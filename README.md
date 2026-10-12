@@ -62,22 +62,65 @@ To clean build artifacts:
 make clean
 ```
 
-### Tested environment
+### Tests and alternate build
 
-Confirmed working on WSL (Windows Subsystem for Linux) on Windows 11.
+```bash
+make test
+make test BIG_N=1
+make test SCALAR=1
+make test BIG_N=1 SCALAR=1
+```
+
+Build modes have separate object directories. When changing compiler flags,
+run `make clean` first, or use separate CMake build directories:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+CMake options are `KLC_BIG_N`, `KLC_SCALAR`, `KLC_NATIVE`, and `KLC_SANITIZERS`.
+Set `KLC_NATIVE=OFF` for a build that does not target the build machine's CPU.
+Sanitizer builds require a toolchain with AddressSanitizer and
+UndefinedBehaviorSanitizer support.
+
+The tests compare all 14,400 pairs in S_5 against a simple independent recurrence,
+check scalar/SIMD enumeration against exhaustive candidates, and cover invalid
+input, cache growth, coefficient overflow, and maximum-size permutations.
+
+To compare two builds, including exact CLI output and
+alternating benchmark runs:
+
+```bash
+python tools/compare_runs.py path/to/build_a path/to/build_b --repeats 5 --report timings.json
+```
+
+`generate_verify.py` creates reproducible fixtures with `--seed`, `--binary`,
+`--timeout`, and `--max-attempts`. Its default output is `verify.generated.txt`;
+use `--output verify.txt` explicitly to replace the checked-in fixture.
+Generated expectations record the chosen binary's behavior and are not an
+independent correctness oracle.
 
 ---
 
 ## Performance
 
-Runtime depends heavily on the input permutations. For $n \le 13$, most pairs complete in a reasonable time, though some cases can take significantly longer.
-
-Measured on AMD Ryzen 5 9600X:
+The explicit SIMD backend is used only for permutations of size at most 16 on
+builds with SSE4.1 enabled. Larger permutations and other targets use the same
+interval enumeration algorithm with scalar rank operations. To compare backends:
 
 ```bash
-time ./klc_cpp 0123456789a 789a3456012
-# ~35 seconds
+make SCALAR=1
 ```
+
+Coefficients use signed 64-bit integers. Arithmetic overflow and polynomial
+capacity overflow are reported as errors instead of producing an incorrect result.
+Invalid inputs, verification mismatches, and file processing errors return a
+nonzero process exit code.
+
+Runtime depends heavily on the input permutations and the size of the recursive
+search. Use the benchmark commands to measure performance for your workloads.
 
 ---
 

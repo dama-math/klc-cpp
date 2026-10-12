@@ -1,8 +1,8 @@
 #include "Lascoux.hpp"
+#include "Bruhat.hpp"
 #include <vector>
 #include <string>
 #include <algorithm>
-#include <iostream>
 #include <stdexcept>
 
 namespace {
@@ -265,13 +265,15 @@ bool has_3412_pattern(const Permutation& p) {
 }
 
 Polynomial calculate_kl(const Permutation& x, const Permutation& w) {
+    if (x.size() != w.size())
+        throw std::invalid_argument("Lascoux: permutation size mismatch");
+    if (!Bruhat::is_bruhat_less_than(x, w)) return Polynomial();
     if (x == w) {
         return Polynomial({1});
     }
     
     if (has_3412_pattern(w)) {
-        std::cerr << "Warning: 3412 pattern detected. Lascoux method invalid.\n";
-        return Polynomial(); 
+        throw std::invalid_argument("Lascoux method requires a 3412-avoiding permutation");
     }
 
     int n = x.size();

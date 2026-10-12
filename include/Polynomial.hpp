@@ -6,7 +6,9 @@
 #include <vector>
 #include <cstdint>
 #include <algorithm>
-#include <cstring>
+#include <stdexcept>
+#include "Config.hpp"
+#include "detail/CheckedArithmetic.hpp"
 
 /**
  * @brief Represents a single-variable polynomial in q with integer coefficients.
@@ -16,7 +18,9 @@
  */
 class Polynomial {
 public:
-    static constexpr int MAX_CAPACITY = 64;
+    // Retain the compact 64-bit-mode layout; accommodate S_24 in large mode.
+    static constexpr int MAX_CAPACITY = MAX_PACKED_SIZE <= 16 ? 64 :
+        MAX_PACKED_SIZE * (MAX_PACKED_SIZE - 1) / 4 + 1;
 
     /** @brief Default constructor creating a zero polynomial (degree -1). */
     Polynomial() : deg(-1) {}
@@ -46,22 +50,7 @@ public:
      * Avoids creating temporary objects during recursive sum accumulation.
      */
     void add_shifted(const Polynomial& rhs, int shift, long long scalar = 1) {
-        if (rhs.deg < 0 || scalar == 0) return;
-        int needed_deg = rhs.deg + shift;
-        if (deg < needed_deg) {
-            for (int i = deg + 1; i <= needed_deg; ++i) data[i] = 0;
-            deg = needed_deg;
-        }
-        if (scalar == 1) {
-            for (int i = 0; i <= rhs.deg; ++i) {
-                data[i + shift] += rhs.data[i];
-            }
-        } else {
-            for (int i = 0; i <= rhs.deg; ++i) {
-                data[i + shift] += rhs.data[i] * scalar;
-            }
-        }
-        trim();
+        accumulate_shifted<false>(rhs, shift, scalar);
     }
 
     /**
@@ -69,22 +58,7 @@ public:
      * Avoids creating temporary objects during recursive correction subtraction.
      */
     void subtract_shifted(const Polynomial& rhs, int shift, long long scalar = 1) {
-        if (rhs.deg < 0 || scalar == 0) return;
-        int needed_deg = rhs.deg + shift;
-        if (deg < needed_deg) {
-            for (int i = deg + 1; i <= needed_deg; ++i) data[i] = 0;
-            deg = needed_deg;
-        }
-        if (scalar == 1) {
-            for (int i = 0; i <= rhs.deg; ++i) {
-                data[i + shift] -= rhs.data[i];
-            }
-        } else {
-            for (int i = 0; i <= rhs.deg; ++i) {
-                data[i + shift] -= rhs.data[i] * scalar;
-            }
-        }
-        trim();
+        accumulate_shifted<true>(rhs, shift, scalar);
     }
 
     /** @brief Evaluates the polynomial at q (e.g. q = 1). */
@@ -96,6 +70,28 @@ public:
 private:
     int deg = -1;
     std::array<long long, MAX_CAPACITY> data{};
+
+    template<bool Subtract>
+    void accumulate_shifted(const Polynomial& rhs, int shift, long long scalar) {
+        if (shift < 0) throw std::invalid_argument("Polynomial shift must be nonnegative");
+        if (rhs.deg < 0 || scalar == 0) return;
+        if (shift >= MAX_CAPACITY || rhs.deg >= MAX_CAPACITY - shift)
+            throw std::length_error("Polynomial degree exceeds MAX_CAPACITY");
+        // Descending traversal preserves rhs when adding a shifted polynomial to itself.
+        const int rhs_degree = rhs.deg;
+        const int needed_degree = rhs_degree + shift;
+        for (int i = deg + 1; i <= needed_degree; ++i) data[i] = 0;
+        for (int i = rhs_degree; i >= 0; --i) {
+            const auto term = scalar == 1 ? rhs.data[i] :
+                klc::detail::checked_multiply(rhs.data[i], scalar);
+            if constexpr (Subtract)
+                data[i + shift] = klc::detail::checked_subtract(data[i + shift], term);
+            else
+                data[i + shift] = klc::detail::checked_add(data[i + shift], term);
+        }
+        deg = std::max(deg, needed_degree);
+        trim();
+    }
 
     void trim() {
         while (deg >= 0 && data[deg] == 0) {

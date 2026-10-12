@@ -6,9 +6,11 @@
 #include <array>
 #include <stdexcept>
 #include <bit>
-#include <cstring>
-#include <immintrin.h>
+#include <algorithm>
+#include <cassert>
 #include "Config.hpp"
+
+namespace klc::detail { struct PermutationAccess; }
 
 /**
  * @brief Represents a permutation in the symmetric group S_n.
@@ -25,13 +27,7 @@ public:
     Permutation() : n(0) {}
 
     /** @brief Constructs a permutation directly from raw array buffer. */
-    Permutation(const ValueType* data_ptr, int n_val) {
-        if (n_val > MAX_SIZE) {
-            throw std::length_error("Permutation size exceeds MAX_SIZE");
-        }
-        n = n_val;
-        std::copy(data_ptr, data_ptr + n, data.begin());
-    }
+    Permutation(const ValueType* data_ptr, int n_val);
 
     /** @brief Constructs a permutation from a vector of integers. */
     Permutation(const std::vector<int>& data_vec);
@@ -61,22 +57,18 @@ public:
         return length_;
     }
 
-    int operator[](int i) const { return data[i]; }
-
-    /** @brief Direct buffer access for in-place algorithms (e.g., Bruhat reduction). */
-    ValueType* data_ptr_mut() { return data.data(); }
-    const ValueType* data_ptr() const { return data.data(); }
-
-    void reset_length_cache() { length_ = -1; }
-    bool has_cached_length() const { return length_ != -1; }
-    void set_cached_length(int len) { length_ = len; }
-
-    void set_size(int new_n) {
-        if (new_n > MAX_SIZE) {
-            throw std::length_error("Permutation size exceeds MAX_SIZE");
-        }
-        n = new_n;
+    int operator[](int i) const {
+        assert(i >= 0 && i < n);
+        return data[i];
     }
+
+    int at(int i) const {
+        if (i < 0 || i >= n) throw std::out_of_range("Permutation index out of range");
+        return data[i];
+    }
+
+    /** @brief Constructs the identity in S_n, validating n before allocating. */
+    static Permutation identity(int size);
 
     /**
      * @brief Packs permutation elements into an integer for fast hash table lookups.
@@ -105,6 +97,8 @@ public:
      * Efficiently updates the Coxeter length: l(w * s_i) = l(w) +- 1.
      */
     Permutation multiply_simple_transposition(int i) const {
+        if (i < 0 || i >= n - 1)
+            throw std::out_of_range("Simple transposition index out of range");
         Permutation result = *this;
         std::swap(result.data[i], result.data[i + 1]);
         if (this->length_ != -1) {
@@ -128,6 +122,7 @@ public:
     std::vector<int> to_vector() const;
 
 private:
+    friend struct klc::detail::PermutationAccess;
     std::array<ValueType, MAX_SIZE> data{};
     int n = 0;
     mutable int length_ = -1;

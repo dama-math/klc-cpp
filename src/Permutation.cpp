@@ -2,12 +2,49 @@
 #include <stdexcept>
 #include <vector>
 
+namespace {
+void validate_size(int size) {
+    if (size < 0 || size > Permutation::MAX_SIZE)
+        throw std::length_error("Permutation size exceeds maximum allowed size (" +
+                                std::to_string(Permutation::MAX_SIZE) + ")");
+}
+
+void validate_value(int value, int size, uint32_t& seen) {
+    if (value < 0 || value >= size || (seen & (uint32_t{1} << value)))
+        throw std::invalid_argument("Invalid permutation: elements must be a permutation of 0 to n-1");
+    seen |= uint32_t{1} << value;
+}
+} // namespace
+
+Permutation::Permutation(const ValueType* values, int size) {
+    validate_size(size);
+    if (size != 0 && values == nullptr)
+        throw std::invalid_argument("Null permutation buffer");
+    n = size;
+    uint32_t seen = 0;
+    for (int i = 0; i < n; ++i) {
+        validate_value(values[i], n, seen);
+        data[i] = values[i];
+    }
+}
+
+Permutation Permutation::identity(int size) {
+    validate_size(size);
+    Permutation p;
+    p.n = size;
+    p.length_ = 0;
+    for (int i = 0; i < size; ++i) p.data[i] = static_cast<ValueType>(i);
+    return p;
+}
+
 Permutation::Permutation(const std::vector<int>& data_vec) {
     if (data_vec.size() > MAX_SIZE) {
         throw std::length_error("Permutation size exceeds maximum allowed size (" + std::to_string(MAX_SIZE) + ")");
     }
     n = static_cast<int>(data_vec.size());
+    uint32_t seen = 0;
     for (int i = 0; i < n; ++i) {
+        validate_value(data_vec[i], n, seen);
         data[i] = static_cast<ValueType>(data_vec[i]);
     }
 }
@@ -17,11 +54,10 @@ Permutation::Permutation(const std::string& one_line_notation) {
 }
 
 void Permutation::parse_one_line_notation(const std::string& notation) {
-    int len = static_cast<int>(notation.size());
-    if (len > MAX_SIZE) {
+    if (notation.size() > MAX_SIZE) {
         throw std::length_error("Permutation size exceeds maximum allowed size (" + std::to_string(MAX_SIZE) + ")");
     }
-    n = len;
+    n = static_cast<int>(notation.size());
 
     uint32_t seen_mask = 0;
     for (int i = 0; i < n; ++i) {
@@ -35,10 +71,7 @@ void Permutation::parse_one_line_notation(const std::string& notation) {
             throw std::invalid_argument(std::string("Invalid character in permutation string: ") + c);
         }
 
-        if (val < 0 || val >= n || ((seen_mask >> val) & 1u)) {
-            throw std::invalid_argument("Invalid permutation: elements must be a permutation of 0 to n-1");
-        }
-        seen_mask |= (1u << val);
+        validate_value(val, n, seen_mask);
         data[i] = static_cast<ValueType>(val);
     }
 }

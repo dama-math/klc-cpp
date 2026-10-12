@@ -1,4 +1,5 @@
 #include "Bruhat.hpp"
+#include "detail/PermutationAccess.hpp"
 #include <algorithm>
 #include <bit>
 #include <cstdint>
@@ -147,8 +148,10 @@ void flatten_inplace(ValueType* x_data, ValueType* w_data, int& n) {
 } // anonymous namespace
 
 bool reduce(Permutation& x, Permutation& w) {
-    auto* x_data = x.data_ptr_mut();
-    auto* w_data = w.data_ptr_mut();
+    if (x.size() != w.size())
+        throw std::invalid_argument("Bruhat reduction requires permutations of equal size");
+    auto* x_data = klc::detail::PermutationAccess::buffer(x);
+    auto* w_data = klc::detail::PermutationAccess::buffer(w);
     int n = x.size();
     if (n <= 1) return true;
 
@@ -156,7 +159,7 @@ bool reduce(Permutation& x, Permutation& w) {
     bool first_iteration = true;
     int total_swaps = 0;
     bool any_removals = false;
-    int orig_x_len = x.has_cached_length() ? x.length() : -1;
+    int orig_x_len = klc::detail::PermutationAccess::cached_length(x);
 
     while (true) {
         int swaps = make_extremal_pair_inplace(x_data, w_data, n);
@@ -170,8 +173,6 @@ bool reduce(Permutation& x, Permutation& w) {
         if (removed > 0) {
             any_removals = true;
             flatten_inplace(x_data, w_data, n);
-            x.set_size(n);
-            w.set_size(n);
         }
 
         if (swaps == 0 && removed == 0) {
@@ -180,14 +181,11 @@ bool reduce(Permutation& x, Permutation& w) {
     }
 
     if (any_removals) {
-        x.reset_length_cache();
-        w.reset_length_cache();
+        klc::detail::PermutationAccess::commit(x, n);
+        klc::detail::PermutationAccess::commit(w, n);
     } else if (total_swaps > 0) {
-        if (orig_x_len != -1) {
-            x.set_cached_length(orig_x_len + total_swaps);
-        } else {
-            x.reset_length_cache();
-        }
+        klc::detail::PermutationAccess::commit(x, n,
+            orig_x_len == -1 ? -1 : orig_x_len + total_swaps);
     }
 
     return originally_ep;
